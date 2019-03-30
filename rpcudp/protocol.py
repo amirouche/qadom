@@ -115,6 +115,12 @@ class RPCProtocol(asyncio.DatagramProtocol):
         del self._outstanding[uid]
 
     def rpc(self, address, name, *args):
+        """Call `name` procedure on remote `address` with `args`.
+
+        Return a future, that might raise a `NoReplyException` if
+        there is no reply after `wait_timeout`.
+
+        """
         uid = uuid4().bytes
         txdata = msgpack.packb([uid, b'\x00', [name, args]])
         if len(txdata) > 8192:
