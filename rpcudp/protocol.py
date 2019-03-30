@@ -49,10 +49,14 @@ class RPCProtocol(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         self.transport = transport
 
-    def datagram_received(self, data, addr):
+    def datagram_received(self, datagram, addr):
         log.debug("received datagram from %s", addr)
 
-        uid, type, data = msgpack.unpackb(datagram)
+        try:
+            uid, type, data = msgpack.unpackb(datagram)
+        except msgpack.UnpackException:
+            log.debug("received malformed packed from %r", addr)
+            return
 
         # process message as a new request or a response
         if type == b'\x00':
