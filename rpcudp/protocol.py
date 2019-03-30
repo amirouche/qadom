@@ -20,9 +20,9 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import asyncio
 import logging
-import os
 from base64 import b64encode
 from hashlib import sha1
+from uuid import uuid4
 
 import msgpack
 
@@ -99,44 +99,20 @@ class RPCProtocol(asyncio.DatagramProtocol):
         self._outstanding[uid][0].set_result((False, None))
         del self._outstanding[uid]
 
-    def __getattr__(self, name):
-        """
-        If name begins with "_" or "rpc_", returns the value of
-        the attribute in question as normal.
+    def rpc(self, name, *args):
+        uid = uuid4().bytes
+        txdata = msgpack.packb([uid, b'\x00', [name, args]])
+        if len(txdata) > 8192:
+            msg = "Total length message cannot exceed 8K"
+            raise MalformedMessage(msg)
+        log.debug("calling remote function %s on %s (uid %s)", name, address, b64encode(uid))
+        self.transport.sendto(txdata, address)
 
-        Otherwise, returns the value as normal *if* the attribute
-        exists, but does *not* raise AttributeError if it doesn't.
-
-        Instead, returns a closure, func, which takes an argument
-        "address" and additional arbitrary args (but not kwargs).
-
-        func attempts to call a remote method "rpc_{name}",
-        passing those args, on a node reachable at address.
-        """
-        if name.startswith("_") or name.startswith("rpc_"):
-            return getattr(super(), name)
-
-        try:
-            return getattr(super(), name)
-        except AttributeError:
-            pass
-
-        def func(address, *args):
-            uid = sha1(os.urandom(32)).digest()
-            txdata = msgpack.packb([uid, b'\x00', [name, args]])
-            if len(txdata) > 8192:
-                msg = "Total length message cannot exceed 8K"
-                raise MalformedMessage(msg)
-            log.debug("calling remote function %s on %s (uid %s)", name, address, b64encode(uid))
-            self.transport.sendto(txdata, address)
-
-            loop = asyncio.get_event_loop()
-            if hasattr(loop, 'create_future'):
-                f = loop.create_future()
-            else:
-                f = asyncio.Future()
-            timeout = loop.call_later(self._wait_timeout, self._timeout, uid)
-            self._outstanding[uid] = (f, timeout)
-            return f
-
-        return func
+        loop = asyncio.get_event_loop()
+        if hasattr(loop, 'create_future'):
+            future = loop.create_future()
+        else:
+            future = asyncio.Future()
+        timeout = loop.call_later(self._wait_timeout, self._timeout, uid)
+        self._outstanding[uid] = (future, timeout)
+        return future
