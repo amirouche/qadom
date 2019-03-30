@@ -51,9 +51,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         log.debug("received datagram from %s", addr)
-        asyncio.ensure_future(self._solve_datagram(data, addr))
 
-    async def _solve_datagram(self, datagram, address):
         uid, type, data = msgpack.unpackb(datagram)
 
         # process message as a new request or a response
