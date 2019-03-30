@@ -67,14 +67,15 @@ class RPCProtocol(asyncio.DatagramProtocol):
             log.debug("Received unknown message from %s, ignoring", address)
 
     def _accept_response(self, uid, data, address):
-        if uid not in self._outstanding:
+        try:
+            f, timeout = self._outstanding[uid]
+        except KeyError:
             log.warning("received unknown message %r from %r; ignoring", data, address)
-            return
-        log.debug("received response %r for message uid %r from %r", data, uid, address)
-        f, timeout = self._outstanding[uid]
-        timeout.cancel()
-        f.set_result((True, data))
-        del self._outstanding[uid]
+        else:
+            log.debug("received response %r for message uid %r from %r", data, uid, address)
+            timeout.cancel()
+            f.set_result((True, data))
+            del self._outstanding[uid]
 
     async def _accept_request(self, uid, data, address):
         # TODO: more validation
