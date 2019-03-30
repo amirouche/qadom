@@ -99,7 +99,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
         self._outstanding[uid][0].set_result((False, None))
         del self._outstanding[uid]
 
-    def rpc(self, name, *args):
+    def rpc(self, address, name, *args):
         uid = uuid4().bytes
         txdata = msgpack.packb([uid, b'\x00', [name, args]])
         if len(txdata) > 8192:
