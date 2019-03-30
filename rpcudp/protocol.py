@@ -87,8 +87,6 @@ class RPCProtocol(asyncio.DatagramProtocol):
             log.warning("%s has no callable method " "rpc_%s; ignoring request", *msgargs)
             return
 
-        if not asyncio.iscoroutinefunction(f):
-            f = asyncio.coroutine(f)
         response = await f(address, *args)
         log.debug("sending response %s for msg id %s to %s", response, b64encode(uid), address)
         data = msgpack.packb([uid, b'\x01', response])
