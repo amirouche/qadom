@@ -24,7 +24,7 @@ import os
 from base64 import b64encode
 from hashlib import sha1
 
-import umsgpack
+import msgpack
 
 
 log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
         asyncio.ensure_future(self._solve_datagram(data, addr))
 
     async def _solve_datagram(self, datagram, address):
-        uid, type, data = umsgpack.unpackb(datagram)
+        uid, type, data = msgpack.unpackb(datagram)
 
         # process message as a new request or a response
         if type == b'\x00':
@@ -86,9 +86,9 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
         if not asyncio.iscoroutinefunction(f):
             f = asyncio.coroutine(f)
-        response = yield from f(address, *args)
+        response = await f(address, *args)
         log.debug("sending response %s for msg id %s to %s", response, b64encode(uid), address)
-        data = umsgpack.packb([uid, b'\x01', response])
+        data = msgpack.packb([uid, b'\x01', response])
         self.transport.sendto(data, address)
 
     def _timeout(self, uid):
@@ -121,7 +121,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
         def func(address, *args):
             uid = sha1(os.urandom(32)).digest()
-            txdata = umsgpack.packb([uid, b'\x00', [name, args]])
+            txdata = msgpack.packb([uid, b'\x00', [name, args]])
             if len(txdata) > 8192:
                 msg = "Total length message cannot exceed 8K"
                 raise MalformedMessage(msg)
