@@ -26,18 +26,23 @@ from hashlib import sha1
 
 import umsgpack
 
-from rpcudp.exceptions import MalformedMessage
 
 log = logging.getLogger(__name__)
 
 
+class MalformedMessage(Exception):
+    """
+    Message does not contain what is expected.
+    """
+
+
 class RPCProtocol(asyncio.DatagramProtocol):
-    def __init__(self, waitTimeout=5):
+    def __init__(self, wait_timeout=5):
         """
         @param waitTimeout: Consider it a connetion failure if no response
         within this time window.
         """
-        self._waitTimeout = waitTimeout
+        self._wait_timeout = wait_timeout
         self._outstanding = {}
         self.transport = None
 
@@ -46,10 +51,10 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         log.debug("received datagram from %s", addr)
-        asyncio.ensure_future(self._solveDatagram(data, addr))
+        asyncio.ensure_future(self._solve_datagram(data, addr))
 
     @asyncio.coroutine
-    def _solveDatagram(self, datagram, address):
+    def _solve_datagram(self, datagram, address):
         if len(datagram) < 22:
             log.warning("received datagram too small from %s,"
                         " ignoring", address)
@@ -60,14 +65,14 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
         if datagram[:1] == b'\x00':
             # schedule accepting request and returning the result
-            asyncio.ensure_future(self._acceptRequest(msgID, data, address))
+            asyncio.ensure_future(self._accept_request(msgID, data, address))
         elif datagram[:1] == b'\x01':
-            self._acceptResponse(msgID, data, address)
+            self._accept_response(msgID, data, address)
         else:
             # otherwise, don't know the format, don't do anything
             log.debug("Received unknown message from %s, ignoring", address)
 
-    def _acceptResponse(self, msgID, data, address):
+    def _accept_response(self, msgID, data, address):
         msgargs = (b64encode(msgID), address)
         if msgID not in self._outstanding:
             log.warning("received unknown message %s "
@@ -81,7 +86,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
         del self._outstanding[msgID]
 
     @asyncio.coroutine
-    def _acceptRequest(self, msgID, data, address):
+    def _accept_request(self, msgID, data, address):
         if not isinstance(data, list) or len(data) != 2:
             raise MalformedMessage("Could not read packet: %s" % data)
         funcname, args = data
@@ -101,7 +106,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
         self.transport.sendto(txdata, address)
 
     def _timeout(self, msgID):
-        args = (b64encode(msgID), self._waitTimeout)
+        args = (b64encode(msgID), self._wait_timeout)
         log.error("Did not received reply for msg "
                   "id %s within %i seconds", *args)
         self._outstanding[msgID][0].set_result((False, None))
@@ -145,7 +150,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
                 f = loop.create_future()
             else:
                 f = asyncio.Future()
-            timeout = loop.call_later(self._waitTimeout, self._timeout, msgID)
+            timeout = loop.call_later(self._wait_timeout, self._timeout, msgID)
             self._outstanding[msgID] = (f, timeout)
             return f
 
