@@ -11,11 +11,18 @@ log = logging.getLogger(__name__)
 
 
 def make_uid():
-    return int(sha256(str(time()).encode('utf8')).hexdigest(), 16)
+    return unpack(sha256(str(time()).encode('utf8')).digest())
 
 
 def nearest(k, peers, uid):
     return nsmallest(k, peers, key=lambda x: x ^ uid)
+
+
+def pack(integer):
+    return integer.to_bytes(32, byteorder='big')
+
+def unpack(bytes):
+    return int.from_bytes(bytes, byteorder='big')
 
 
 class _Peer:
@@ -48,44 +55,41 @@ class _Peer:
         self._protocol.register(self.store)
 
     async def bootstrap(self, address):
-        uid = hex(self._uid)[2:].encode('utf8')
-        uid = await self._protocol.rpc(address, 'ping', uid)
+        uid = await self._protocol.rpc(address, 'ping', pack(self._uid))
         await self.ping(address, uid)
 
     # remote procedures
 
     async def ping(self, address, uid):
         log.debug("ping from %r uid=%r", address, uid)
-        uid = int(uid.decode('utf8'), 16)
+        uid = unpack(uid)
         self._peers[uid] = address
-        return hex(self._uid)[2:].encode('utf8')
+        return pack(self._uid)
 
     async def find_peers(self, address, uid):
         log.debug("find peers from %r uid=%r", address, uid)
-        uid = int(uid.decode('utf8'), 16)
+        uid = unpack(uid)
         uids = nearest(self.CONCURRENCY, self._peers.keys(), uid)
-        out = [(hex(uid)[2:].encode('utf8'), self._peers[uid]) for uid in uids]
+        out = [(pack(uid), self._peers[uid]) for uid in uids]
         return out
 
     async def find_value(self, address, key):
         log.debug("find value from %r key=%r", address, key)
-        key2 = int(key.decode('utf8'), 16)
         try:
-            return ('VALUE', self._storage[key2])
+            return (b'VALUE', self._storage[unpack(key)])
         except KeyError:
             out = await self.find_peers(None, key)
-            return ('PEERS', out)
+            return (b'PEERS', out)
 
     async def store(self, address, value):
         log.debug("store from %r", address)
-        key = int(sha256(value).hexdigest(), 16)
+        key = unpack(sha256(value).digest())
         self._storage[key] = value
         return True
 
     # local methods
 
     async def get(self, key):
-        local = int(key, 16)
         try:
             return self._storage[key]
         except KeyError:
@@ -93,35 +97,29 @@ class _Peer:
             return out
 
     async def _get(self, key):
-        key = key.encode('utf8')
+        key = pack(key)
         queried = set()
         while True:
-            # retrieve the k nearest peers
+            # retrieve the k nearest peers and remove already queried peers
             peers = await self.find_peers(None, key)
-            # remove already queried peers
-            to_remove = []
-            for (uid, address) in peers:
-                if uid in queried:
-                    to_remove.append((uid, address))
-            for item in to_remove:
-                peers.remove(item)
+            peers = [(uid, address) for (uid, address) in peers if unpack(uid) not in queried]
             # no more peer to query, the key is not found in the dht
             if not peers:
-                raise KeyError(key)
+                raise KeyError(unpack(key))
             # query selected peers
             queries = []
             for _, address in peers:
-                query = self._protocol.rpc(address, 'find_value', key)
+                query = self._protocol.rpc(tuple(address), 'find_value', key)
                 queries.append(query)
             responses = await asyncio.gather(*queries, return_exceptions=True)
             for (response, (peer, address)) in zip(responses, peers):
-                queried.add(peer)
+                queried.add(unpack(peer))
                 if isinstance(response, Exception):
                     continue
                 elif response[0] == b'VALUE':
+                    # TODO: check value's sha256
                     value = response[1]
-                    key = int(key.decode('utf8'), 16)
-                    self._storage[key] = value
+                    self._storage[unpack(key)] = value
                     return value
                 elif response[0] == b'PEERS':
                     for peer, address in response[1]:
@@ -130,29 +128,24 @@ class _Peer:
                     log.warning('unknown response %r from %r', response[0], address)
 
     async def set(self, value):
-        # unlike kademlia we store our own value
-        digest = sha256(value.encode('utf8')).hexdigest()
-        key = int(digest, 16)
+        # unlike kademlia store value locally
+        key = unpack(sha256(value).digest())
         self._storage[key] = value
         # store in the dht, find the nearest peers and call store rpc
-        key = digest.encode('utf8')
+        key = pack(key)
         queried = set()
         while True:
+            # find peers and remove already queried peers
             peers = await self.find_peers(None, key)
-            # remove already queried peers
-            to_remove = []
-            for (uid, address) in peers:
-                if uid in queried:
-                    to_remove.append((uid, address))
-            for item in to_remove:
-                peers.remove(item)
+            peers = [(uid, address) for (uid, address) in peers if unpack(uid) not in queried]
             # no more peer to query, the nearest peers in the network
             # are known
             if not peers:
                 peers = await self.find_peers(None, key)
-                for (peer, address) in peers:
-                    await self._protocol.rpc(address, 'store', value)
-                return digest
+                queries = [self._protocol.rpc(tuple(address), 'store', value) for (_, address) in peers]
+                # TODO: make sure CONCURRENCY is fullfilled
+                await asyncio.gather(*queries, return_exceptions=True)
+                return unpack(key)
             # query selected peers
             queries = []
             for _, address in peers:
@@ -160,7 +153,7 @@ class _Peer:
                 queries.append(query)
             responses = await asyncio.gather(*queries, return_exceptions=True)
             for (response, (peer, address)) in zip(responses, peers):
-                queried.add(peer)
+                queried.add(unpack(peer))
                 if isinstance(response, Exception):
                     continue
                 for peer, address in response:
