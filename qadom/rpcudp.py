@@ -59,13 +59,13 @@ class RPCProtocol(asyncio.DatagramProtocol):
         self.procedures = {}
 
     def register(self, proc):
-        self.procedures[proc.__name__] = proc
+        self.procedures[proc.__name__.encode('utf8')] = proc
 
     def connection_made(self, transport):
         self._transport = transport
 
-    def datagram_received(self, datagram, addr):
-        log.debug("received datagram from %s", addr)
+    def datagram_received(self, datagram, address):
+        log.debug("received datagram from %s", address)
 
         try:
             uid, type, data = msgpack.unpackb(datagram)
@@ -100,7 +100,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
         try:
             procedure = self.procedures[name]
         except KeyError:
-            log.warning("%s has no callable method " "rpc_%s; ignoring request", *msgargs)
+            log.warning("has no callable method %r; ignoring request", name)
         else:
             response = await procedure(address, *args)
             log.debug("sending response %s for msg id %s to %s", response, b64encode(uid), address)

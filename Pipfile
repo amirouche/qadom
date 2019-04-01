@@ -9,6 +9,7 @@ ipython = "*"
 [packages]
 msgpack-python = "*"
 pytest = "*"
+daiquiri = "*"
 
 [requires]
 python_version = "3.6"

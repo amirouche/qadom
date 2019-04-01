@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "c3890973b701813d0e848ce691d7ebc425ef15bdb20ad13ae9ccb5153c8df9fa"
+            "sha256": "3c76f10c41bdee5330b5797339e40d1960b75106eb669b163c8eef424c432950"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -29,6 +29,14 @@
                 "sha256:f0b870f674851ecbfbbbd364d6b5cbdff9dcedbc7f3f5e18a6891057f21fe399"
             ],
             "version": "==19.1.0"
+        },
+        "daiquiri": {
+            "hashes": [
+                "sha256:8832f28e110165b905993b4bdab638a3c245f5671d5976f226f2628e7d2e7862",
+                "sha256:ac0e69ac0a8c4ceabcf57f14ba4dc7b5940dc2bf9d1ee620d2ae9fa8f78c7891"
+            ],
+            "index": "pypi",
+            "version": "==1.5.0"
         },
         "more-itertools": {
             "hashes": [
