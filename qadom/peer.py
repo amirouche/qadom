@@ -213,8 +213,11 @@ class _Peer:
         """Store VALUE in the network.
 
         Return the uid where the value is stored."""
-        # unlike kademlia store value locally
+        if len(value) > (8192 - 28):  # datagram max size minus
+                                      # "header", see RPCProtocol.
+            raise ValueError('value too big')
         key = unpack(sha256(value).digest())
+        # unlike kademlia store value locally
         self._storage[key] = value
         # store in the dht, find the nearest peers and call store rpc
         key = pack(key)
