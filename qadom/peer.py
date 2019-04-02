@@ -115,7 +115,7 @@ class _Peer:
         """Remote procedure that returns peers that are near UID"""
         # The code is riddle with unpack/pack calls because Peer
         # stores key/uid as integer and msgpack doesn't accept such
-        # big integers hence it required to pass them as bytes.
+        # big integers hence it is required to pass them as bytes.
         uid = unpack(uid)
         log.debug("find peers uid=%r from %r", uid, address)
         # XXX: if this takes more than 5 seconds (see RPCProtocol) it
@@ -137,7 +137,7 @@ class _Peer:
             return (b'PEERS', out)
 
     async def store(self, address, value):
-        """Remove procedure that stores value locally with its digest as
+        """Remote procedure that stores value locally with its digest as
         key"""
         log.debug("store from %r", address)
         key = unpack(sha256(value).digest())
@@ -147,7 +147,7 @@ class _Peer:
     # keys procedures
 
     async def append(self, address, key, value):
-        """Remote procedure that adds VALUE to the list of UID at KEY"""
+        """Remote procedure that appends VALUE to the list of uid at KEY"""
         log.debug("append key=%r value=%r from %r", key, value, address)
         # TODO: check valid
         self._keys[unpack(key)].append(unpack(value))
@@ -300,7 +300,7 @@ class _Peer:
             # retrieve the k nearest peers and remove already queried peers
             peers = await self.find_peers(None, key)
             peers = [(uid, address) for (uid, address) in peers if unpack(uid) not in queried]
-            # no more peer to query, the key is not found in the dht
+            # no more peer to query
             if not peers:
                 return out
             # query selected peers
