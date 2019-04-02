@@ -46,7 +46,7 @@ class _Peer:
     # how many peers are returned in find_peers, how many peers will
     # receive store calls to store a value and also the number of
     # peers that are contacted when looking up peers in find_peers.
-    CONCURRENCY = 20
+    REPLICATION = 20
 
     def __init__(self, uid):
         # keys associates a key with a list of key.  This can be
@@ -120,7 +120,7 @@ class _Peer:
         log.debug("find peers uid=%r from %r", uid, address)
         # XXX: if this takes more than 5 seconds (see RPCProtocol) it
         # will timeout in the other side.
-        uids = nearest(self.CONCURRENCY, self._peers.keys(), uid)
+        uids = nearest(self.REPLICATION, self._peers.keys(), uid)
         out = [(pack(uid), self._peers[uid]) for uid in uids]
         return out
 
@@ -231,7 +231,7 @@ class _Peer:
             if not peers:
                 peers = await self.find_peers(None, key)
                 queries = [self._protocol.rpc(tuple(address), 'store', value) for (_, address) in peers]
-                # TODO: make sure CONCURRENCY is fullfilled
+                # TODO: make sure REPLICATION is fullfilled
                 await asyncio.gather(*queries, return_exceptions=True)
                 return unpack(key)
             # query selected peers
@@ -279,7 +279,7 @@ class _Peer:
             if not peers:
                 peers = await self.find_peers(None, key)
                 queries = [self._protocol.rpc(tuple(x), 'append', key, value) for (_, x) in peers]
-                # TODO: make sure CONCURRENCY is fullfilled
+                # TODO: make sure REPLICATION is fullfilled
                 await asyncio.gather(*queries, return_exceptions=True)
                 return
             # query selected peers
