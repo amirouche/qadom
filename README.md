@@ -95,7 +95,7 @@ fetch the values associated with `KEY` including `VALUE`.
   - `peer.set(value)`
   - `peer.get(key)`
 
-- keyword
+- keys
   - `peer.append(key, value)`
   - `peer.search(key)`
 
