@@ -1,0 +1,70 @@
+body {
+    background: url('bg.png');
+    font-family: 'tex_gyre_pagellaregular', serif;
+    color: #EEE;
+    font-size: 22px;
+    line-height: 1.6em;
+    padding: 15px;
+    text-shadow: 1px 1px 0px black;
+    margin: 50px 0px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: "League Gothic", Impact, sans;
+    text-shadow: 2px 2px 0px black;
+    margin: 0px;
+    padding: 0px;
+    line-height: 1em;
+    font-weight: normal;
+}
+
+p {
+    margin: 0px;
+    padding: 0px;
+}
+
+a:link,
+a:active {
+  color: rgb(200, 10, 10);
+  text-decoration: none;
+}
+
+a:visited {
+  color: gray;
+  text-decoration: none;
+}
+
+a:hover {
+  color: pink;
+}
+
+#root {
+  background: hsla(0, 0%, 0%, 0.3);
+  background: linear-gradient(0deg, hsla(0, 0%, 0%, 0.1) 5px, hsla(0, 0%, 100%, 0.1));
+  border-bottom: 1px solid hsla(0, 0%, 0%, 1);
+  border-radius: 3px;
+  border-right: 1px solid hsla(0, 0%, 0%, 1);
+  box-shadow: -1px -1px 0px hsla(0, 0%, 100%, 0.3), 1px 1px 2px black;
+  display: block;
+  margin: auto;
+  margin-bottom: 15px;
+  max-width: 700px;
+  padding: 15px;
+  text-align: justify;
+  box-sizing: border-box;
+}
+
+hr {
+  max-width: 500px;
+  margin-bottom: 15px;
+}
+
+textarea, input {
+  width: 500px;
+  border: 0px;
+  color: white;
+}
+
+input {
+  cursor: pointer;
+}
