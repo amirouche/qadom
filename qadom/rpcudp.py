@@ -71,7 +71,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
             return
 
         try:
-            uid, type, data = msgpack.unpackb(datagram)
+            uid, type, data = msgpack.unpackb(datagram, use_list=False)
         except msgpack.UnpackException:
             log.debug("received malformed packed from %r", addr)
             return

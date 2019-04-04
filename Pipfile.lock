@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "8f47bf9bfb72dca85766ccb4f5a6a7ad6a31e947b9b708964b9267efa37a0c5d"
+            "sha256": "e89c52c57487d73764f6b704bfe37fb3cf046161d41e497a6b17d7fb9ec730fb"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -234,6 +234,13 @@
             ],
             "version": "==4.5.3"
         },
+        "debug": {
+            "hashes": [
+                "sha256:1f90e6bd9f92b8611a466cd1cf6e18ec94f8d22b2b9f11d0f3c2941cac1e475b"
+            ],
+            "index": "pypi",
+            "version": "==0.3.2"
+        },
         "decorator": {
             "hashes": [
                 "sha256:86156361c50488b84a3f148056ea716ca587df2f0de1d34750d35c21312725de",
@@ -276,6 +283,12 @@
             ],
             "markers": "python_version < '3.7'",
             "version": "==1.0.2"
+        },
+        "ipdb": {
+            "hashes": [
+                "sha256:dce2112557edfe759742ca2d0fee35c59c97b0cc7a05398b791079d78f1519ce"
+            ],
+            "version": "==0.12"
         },
         "ipython": {
             "hashes": [
@@ -462,6 +475,13 @@
                 "sha256:e23d0cc5299223dcc37885dae624f382297717e459ea24053709675a976a3e19"
             ],
             "version": "==5.1"
+        },
+        "see": {
+            "hashes": [
+                "sha256:14f8f8a88a909a7d7dea81f0016e3fdfabd3b5d335992e102a382e1a71672bd1",
+                "sha256:378616d17ed7e0913701f7cb3ff3fc1c7c618da0f6a2144ce21f0d3c493ba0d2"
+            ],
+            "version": "==1.4.1"
         },
         "six": {
             "hashes": [

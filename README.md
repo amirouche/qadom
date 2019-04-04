@@ -111,7 +111,7 @@ Returns the value associated with `PUBLIC_KEY` and `KEY` that match
 
 ### RPC API
 
-- DHT
+- dict
 
   - `peer.set(value)`
   - `peer.get(key)`

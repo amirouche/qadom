@@ -11,12 +11,14 @@ pylama = "*"
 bandit = "*"
 pre-commit = "*"
 pytest-cov = "*"
+debug = "*"
 
 [packages]
 msgpack-python = "*"
 pytest = "*"
 daiquiri = "*"
 cryptography = "*"
+bases-py = "*"
 
 [requires]
 python_version = "3.6"
