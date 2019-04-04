@@ -34,7 +34,7 @@ def nearest(k, peers, uid):
     # XXX: It only works with len(peers) < 10^6 more than that count
     # of peers and the time it takes to compute the nearest peers will
     # timeout after 5 seconds on the other side. See RPCProtocol and
-    # Peer.find_peers.
+    # Peer.peers.
     return nsmallest(k, peers, key=functools.partial(operator.xor, uid))
 
 
@@ -59,9 +59,9 @@ class _Peer:
     def __init__(self, uid, private_key, replication=REPLICATION_DEFAULT):
         assert replication <= REPLICATION_MAX
         # equivalent to k in kademlia, also used as alpha. It specify the
-        # how many peers are returned in find_peers, how many peers will
+        # how many peers are returned in peers, how many peers will
         # receive store calls to store a value and also the number of
-        # peers that are contacted when looking up peers in find_peers.
+        # peers that are contacted when looking up peers in peers.
         self.replication = replication
         # bag associates a key with a set of key.  This can be freely
         # set by peers in the network and allows to link a well known
@@ -124,7 +124,7 @@ class _Peer:
         self._transport, self._protocol = await listen
         # register remote procedures
         self._protocol.register(self.ping)
-        self._protocol.register(self.find_peers)
+        self._protocol.register(self.peers)
         self._protocol.register(self.find_value)
         self._protocol.register(self.store)
         self._protocol.register(self.add)
@@ -157,7 +157,7 @@ class _Peer:
         self._addresses[address] = uid
         return pack(self._uid)
 
-    async def find_peers(self, address, uid):
+    async def peers(self, address, uid):
         """Remote procedure that returns peers that are near UID"""
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
@@ -185,7 +185,7 @@ class _Peer:
         try:
             return (b'VALUE', self._storage[unpack(key)])
         except KeyError:
-            out = await self.find_peers(None, key)
+            out = await self.peers(None, key)
             return (b'PEERS', out)
 
     async def store(self, address, value):
@@ -197,7 +197,7 @@ class _Peer:
         log.debug("[%r] store from %r", self._uid, address)
         key = digest(value)
         # check that peer is near the key
-        peers = await self.find_peers(None, pack(key))
+        peers = await self.peers(None, pack(key))
         peers = nearest(REPLICATION_MAX, peers, key)
         high = peers[-1] ^ key
         current = self._uid ^ key
@@ -243,7 +243,7 @@ class _Peer:
             values = [pack(v) for v in self._bag[uid]]
             return (b'VALUES', values)
         else:
-            peers = await self.find_peers(None, pack(uid))
+            peers = await self.peers(None, pack(uid))
             return (b'PEERS', peers)
 
     # namespace procedures
@@ -278,7 +278,7 @@ class _Peer:
                 pass
         # key not found, return nearest peers
         uid = digest(msgpack.packb((public_key, key)))
-        peers = await self.find_peers(None, pack(uid))
+        peers = await self.peers(None, pack(uid))
         return (b'PEERS', peers)
 
     # local methods
@@ -300,7 +300,7 @@ class _Peer:
         queried = set()
         while True:
             # retrieve the k nearest peers and remove already queried peers
-            peers = await self.find_peers(None, key)
+            peers = await self.peers(None, key)
             peers = [address for address in peers if address not in queried]
             # no more peer to query, the key is not found in the dht
             if not peers:
@@ -349,12 +349,12 @@ class _Peer:
         queried = set()
         while True:
             # find peers and remove already queried peers
-            peers = await self.find_peers(None, key)
+            peers = await self.peers(None, key)
             peers = [address for address in peers if address not in queried]
             # no more peer to query, the nearest peers in the network
             # are known
             if not peers:
-                peers = await self.find_peers(None, key)
+                peers = await self.peers(None, key)
                 queries = [self._protocol.rpc(address, 'store', value) for address in peers]
                 # TODO: make sure replication is fullfilled
                 await asyncio.gather(*queries, return_exceptions=True)
@@ -362,7 +362,7 @@ class _Peer:
             # query selected peers
             queries = []
             for address in peers:
-                query = self._protocol.rpc(address, 'find_peers', key)
+                query = self._protocol.rpc(address, 'peers', key)
                 queries.append(query)
             responses = await asyncio.gather(*queries, return_exceptions=True)
             for (response, address) in zip(responses, peers):
@@ -402,12 +402,12 @@ class _Peer:
         queried = set()
         while True:
             # find peers and remove already queried peers
-            peers = await self.find_peers(None, key)
+            peers = await self.peers(None, key)
             peers = [address for address in peers if address not in queried]
             # no more peer to query, the nearest peers in the network
             # are known
             if not peers:
-                peers = await self.find_peers(None, key)
+                peers = await self.peers(None, key)
                 queries = [self._protocol.rpc(address, 'add', key, value) for address in peers]
                 # TODO: make sure replication is fullfilled
                 await asyncio.gather(*queries, return_exceptions=True)
@@ -415,7 +415,7 @@ class _Peer:
             # query selected peers
             queries = []
             for address in peers:
-                query = self._protocol.rpc(address, 'find_peers', key)
+                query = self._protocol.rpc(address, 'peers', key)
                 queries.append(query)
             responses = await asyncio.gather(*queries, return_exceptions=True)
             for (response, address) in zip(responses, peers):
@@ -435,7 +435,7 @@ class _Peer:
         queried = set()
         while True:
             # retrieve the k nearest peers and remove already queried peers
-            peers = await self.find_peers(None, key)
+            peers = await self.peers(None, key)
             peers = [address for address in peers if address not in queried]
             # no more peer to query
             if not peers:
@@ -484,7 +484,7 @@ class _Peer:
         queried = set()
         while True:
             # retrieve the k nearest peers and remove already queried peers
-            peers = await self.find_peers(None, uid)
+            peers = await self.peers(None, uid)
             peers = [address for address in peers if address not in queried]
             # no more peer to query, the key is not found
             if not peers:
@@ -535,7 +535,7 @@ class _Peer:
         queried = set()
         while True:
             # find peers and remove already queried peers
-            peers = await self.find_peers(None, uid)
+            peers = await self.peers(None, uid)
             peers = [address for address in peers if address not in queried]
             # no more peer to query, the nearest peers in the network
             # are known
@@ -544,7 +544,7 @@ class _Peer:
                 payload = msgpack.packb((key, value))
                 signature = self._private_key.sign(payload)
                 # call rpc in nearest peers
-                peers = await self.find_peers(None, uid)
+                peers = await self.peers(None, uid)
                 queries = []
                 for address in peers:
                     query = self._protocol.rpc(
@@ -562,7 +562,7 @@ class _Peer:
             # query selected peers
             queries = []
             for address in peers:
-                query = self._protocol.rpc(address, 'find_peers', uid)
+                query = self._protocol.rpc(address, 'peers', uid)
                 queries.append(query)
             responses = await asyncio.gather(*queries, return_exceptions=True)
             for (response, address) in zip(responses, peers):
