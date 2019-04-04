@@ -62,8 +62,12 @@ class _Peer:
         # keywords. See 'Peer.append' and 'Peer.search'.
         self._keys = defaultdict(list)
         # peers stores the equivalent of the kademlia routing table
-        # aka. kbuckets.
+        # aka. kbuckets. uid/key to address mapping.
         self._peers = dict()
+        # address to uid/key mapping
+        self._addresses = dict()
+        # blacklist misbehaving nodes. Stores uid/key.
+        self._blacklist = set()
         # RPCProtocol set in Peer.listen
         self._protocol = None
         # storage associate a key to a value.  The key must always be
@@ -81,6 +85,16 @@ class _Peer:
 
     def close(self):
         self._transport.close()
+
+    def blacklist(self, address):
+        try:
+            uid = self._addresses[address]
+        except KeyError:
+            pass
+        else:
+            del self._addresses[address]
+            del self._peers[uid]
+        self._blacklist.add(uid)
 
     async def listen(self, port, interface='0.0.0.0'):
         """Start listening on the given port.
@@ -116,6 +130,7 @@ class _Peer:
         uid = unpack(uid)
         log.debug("ping uid=%r from %r", uid, address)
         self._peers[uid] = address
+        self._addresses[address] = uid
         return pack(self._uid)
 
     async def find_peers(self, address, uid):
@@ -155,8 +170,8 @@ class _Peer:
         current = self._uid ^ key
         if current > high:
             log.warning('received a value that is too far from %r', address)
+            self.blacklist(address)
             # XXX: pretend the value was stored
-            # TODO: blacklist address
             return True
         else:
             self._storage[key] = value
