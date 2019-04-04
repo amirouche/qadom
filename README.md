@@ -59,11 +59,11 @@ pipenv shell
 ipython -i peer2.py
 ```
 
-That all folks!
+That's all folks!
 
 ## Documentation
 
-Read the code it has docstrings!!
+Read the code it has docstrings!!!
 
 ### Local API
 
@@ -78,32 +78,54 @@ raises `KeyError`.
 Takes bytes as `VALUE` that must be smaller that 8K, store it locally
 and somewhere in the network. Returns the key where it is stored.
 
-### `peer.key(key)`
+#### `peer.bag(key)`
 
-Takes an integer below 2^256 as `KEY` and return the identifiers
-associated with it in the network.
+Takes an integer below 2^256 as `KEY` and return the set of
+identifiers associated with it in the network.
 
-### `peer.key(key, value)`
+#### `peer.bag(key, value)`
 
 Both `KEY` and `VALUE` must be integers below 2^256. `VALUE` will be
-associated with `KEY` in the network. Later, use `peer.key(key)` to
-fetch the values associated with `KEY` including `VALUE`.
+associated with `KEY` in the network.
+
+Use `peer.bag(key)` to fetch the set of values associated with `KEY`
+including `VALUE`.
+
+#### `peer.namespace(key, value)`
+
+`KEY` must be an integer below 2**256 and value must be bytes less
+than 8K. Store KEY and VALUE under the namespace described by the
+peer's public key.
+
+Use `peer.namespace(key, public_key=public_key)` to retrieve `VALUE`.
+
+#### `peer.namespace(key, public_key=public_key)`
+
+Both `KEY` and `PUBLIC_KEY` must be integers. `KEY` must be below
+2**256.
+
+Returns the value associated with `PUBLIC_KEY` and `KEY` in the
+network.
+
 
 ### RPC API
 
 - DHT
+
   - `peer.set(value)`
   - `peer.get(key)`
 
-- keys
-  - `peer.append(key, value)`
+- bag
+
+  - `peer.add(key, value)`
   - `peer.search(key)`
 
 - pubsub (TODO)
+
   - `peer.publish(key, value)`
   - `peer.subscribe(key)`
 
-- namespace (TODO, see https://stackoverflow.com/q/55455548/140837)
-  - `peer.namespace_set(public_key, signature, key, value)`
-	- where `signature == sign(private_key, public_key, key, value)`
+- namespace
+
+  - `peer.namespace_set(public_key, key, value, signature)`
   - `peer.namespace_get(public_key, key)`

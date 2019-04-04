@@ -62,11 +62,11 @@ class _Peer:
         # receive store calls to store a value and also the number of
         # peers that are contacted when looking up peers in find_peers.
         self.replication = replication
-        # keys associates a key with a list of key.  This can be
-        # freely set by peers in the network and allows to link a well
-        # known key to other keys. It is inspired from gnunet-fs
-        # keywords. See 'Peer.append' and 'Peer.search'.
-        self._keys = defaultdict(list)
+        # bag associates a key with a set of key.  This can be freely
+        # set by peers in the network and allows to link a well known
+        # key to other keys. It is inspired from gnunet-fs keywords
+        # feature. See 'Peer.add' and 'Peer.search'.
+        self._bag = defaultdict(set)
         # peers stores the equivalent of the kademlia routing table
         # aka. kbuckets. uid/key to address mapping.
         self._peers = dict()
@@ -142,7 +142,7 @@ class _Peer:
         """Remote procedure that register the remote and returns the uid"""
         if address in self._blacklist:
             # XXX: pretend everything is ok
-            return self._uid
+            return pack(self._uid)
         uid = unpack(uid)
         log.debug("ping uid=%r from %r", uid, address)
         self._peers[uid] = address
@@ -204,12 +204,12 @@ class _Peer:
 
     # bag procedures
 
-    async def append(self, address, key, value):
-        """Remote procedure that appends VALUE to the list of uid at KEY"""
+    async def add(self, address, key, value):
+        """Remote procedure that adds VALUE to the list of uid at KEY"""
         if address in self._blacklist:
             # XXX: pretend everything is ok
             return True
-        log.debug("append key=%r value=%r from %r", key, value, address)
+        log.debug("add key=%r value=%r from %r", key, value, address)
         # TODO: do more validation and blacklist if error
         key = unpack(key)
         value = unpack(value)
@@ -218,7 +218,7 @@ class _Peer:
             # XXX: pretend everything is ok
             return True
         else:
-            self._keys[key].append(value)
+            self._bag[key].add(value)
             return True
 
     async def search(self, address, key):
@@ -228,9 +228,10 @@ class _Peer:
         if address in self._blacklist:
             # XXX: pretend everything is ok
             return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
+
         key = unpack(key)
-        if key in self._keys:
-            values = [pack(v) for v in self._keys[key]]
+        if key in self._bag:
+            values = [pack(v) for v in self._bag[key]]
             return (b'VALUES', values)
         else:
             peers = await self.find_peers(None, pack(key))
@@ -242,6 +243,7 @@ class _Peer:
         if address in self._blacklist:
             # XXX: pretend everything is ok
             return True
+        # TODO: check (public_key, key) is inside self's perimeter
         public = PublicKey.from_public_bytes(public_key)
         try:
             public.verify(signature, msgpack.packb((key, value)))
@@ -276,6 +278,7 @@ class _Peer:
         """Local method to fetch the value associated with KEY
 
         KEY must be an integer below 2^256"""
+        assert key <= 2**256
         try:
             return self._storage[key]
         except KeyError:
@@ -283,7 +286,7 @@ class _Peer:
             return out
 
     async def _get(self, key):
-        """Fetch the value from the network"""
+        """Fetch the value associated with KEY from the network"""
         key = pack(key)
         queried = set()
         while True:
@@ -310,14 +313,14 @@ class _Peer:
                     return value
                 elif response[0] == b'PEERS':
                     for peer, address in response[1]:
-    await self.ping(tuple(address), peer)
+                        await self.ping(tuple(address), peer)
                 else:
                     log.warning('unknown response %r from %r', response[0], address)
 
     async def set(self, value):
         """Store VALUE in the network.
 
-        Return the uid where the value is stored."""
+        Return the uid with which it is associated aka. sha256 integer representation."""
         if len(value) > (8192 - 28):  # datagram max size minus
                                       # "header", see RPCProtocol.
             raise ValueError('value too big')
@@ -354,8 +357,8 @@ class _Peer:
 
     # key local method
 
-    async def key(self, key, value=None):
-        """Key search and publish.
+    async def bag(self, key, value=None):
+        """Bag search and publish.
 
         If VALUE is set, it will append VALUE to KEY in the network.
         If VALUE is NOT set, it will lookup uid associated with KEY in
@@ -365,12 +368,12 @@ class _Peer:
 
         """
         if value is None:
-            out = await self._key_search(key)
+            out = await self._search(key)
             return out
         else:
-            await self._key_publish(key, value)
+            await self._add(key, value)
 
-    async def _key_publish(self, key, value):
+    async def _add(self, key, value):
         """Publish VALUE at KEY"""
         key = pack(key)
         value = pack(value)
@@ -384,7 +387,7 @@ class _Peer:
             # are known
             if not peers:
                 peers = await self.find_peers(None, key)
-                queries = [self._protocol.rpc(tuple(x), 'append', key, value) for (_, x) in peers]
+                queries = [self._protocol.rpc(tuple(x), 'add', key, value) for (_, x) in peers]
                 # TODO: make sure replication is fullfilled
                 await asyncio.gather(*queries, return_exceptions=True)
                 return
@@ -401,7 +404,7 @@ class _Peer:
                 for peer, address in response:
                     await self.ping(tuple(address), peer)
 
-    async def _key_search(self, key):
+    async def _search(self, key):
         """Search values associated with KEY"""
         out = set()
         queried = set()
@@ -435,11 +438,14 @@ class _Peer:
     # namespace local method
 
     async def namespace(self, key, value=None, public_key=None):
+        assert key <= 2**256
         if value is None:
             assert public_key is not None
+            assert public_key <= 2**256
             out = await self._namespace_get(public_key, key)
             return out
         else:
+            assert len(value) < 8000  # TODO: compute the actual max size
             await self._namespace_set(key, value)
 
     async def _namespace_get(self, public_key, key):
