@@ -202,7 +202,7 @@ class _Peer:
             self._storage[key] = value
             return True
 
-    # keys procedures
+    # bag procedures
 
     async def append(self, address, key, value):
         """Remote procedure that appends VALUE to the list of uid at KEY"""
@@ -266,7 +266,7 @@ class _Peer:
             except KeyError:
                 pass
         # key not found, return nearest peers
-        uid = digest(msgpack.packb((public_key, key))
+        uid = digest(msgpack.packb((public_key, key)))
         peers = await self.find_peers(None, pack(uid))
         return (b'PEERS', peers)
 
@@ -310,7 +310,7 @@ class _Peer:
                     return value
                 elif response[0] == b'PEERS':
                     for peer, address in response[1]:
-                        await self.ping(tuple(address), peer)
+    await self.ping(tuple(address), peer)
                 else:
                     log.warning('unknown response %r from %r', response[0], address)
 
@@ -469,7 +469,7 @@ class _Peer:
                     return value
                 elif response[0] == b'PEERS':
                     for peer, address in response[1]:
-                        await self.ping(tuple(address), peer)
+                    await self.ping(tuple(address), peer)
                 else:
                     log.warning('unknown response %r from %r', response[0], address)
 
