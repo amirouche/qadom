@@ -125,7 +125,7 @@ class _Peer:
         # register remote procedures
         self._protocol.register(self.ping)
         self._protocol.register(self.peers)
-        self._protocol.register(self.find_value)
+        self._protocol.register(self.value)
         self._protocol.register(self.store)
         self._protocol.register(self.add)
         self._protocol.register(self.search)
@@ -175,7 +175,7 @@ class _Peer:
 
     # dict procedures (vanilla dht api)
 
-    async def find_value(self, address, key):
+    async def value(self, address, key):
         """Remote procedure that returns the associated value or peers that
         are near KEY"""
         if address[0] in self._blacklist:
@@ -308,7 +308,7 @@ class _Peer:
             # query selected peers
             queries = []
             for address in peers:
-                query = self._protocol.rpc(address, 'find_value', key)
+                query = self._protocol.rpc(address, 'value', key)
                 queries.append(query)
             responses = await asyncio.gather(*queries, return_exceptions=True)
             for (response, address) in zip(responses, peers):
