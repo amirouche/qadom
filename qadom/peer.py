@@ -307,10 +307,14 @@ class _Peer:
                 if isinstance(response, Exception):
                     continue
                 elif response[0] == b'VALUE':
-                    # TODO: check value's sha256
                     value = response[1]
-                    self._storage[unpack(key)] = value
-                    return value
+                    if digest(value) == unpack(key):
+                        self._storage[unpack(key)] = value
+                        return value
+                    else:
+                        log.warning('bad value returned from %r', address)
+                        self.blacklist(address)
+                        continue
                 elif response[0] == b'PEERS':
                     for peer, address in response[1]:
                         await self.ping(tuple(address), peer)
