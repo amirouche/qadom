@@ -7,6 +7,12 @@ from collections import defaultdict
 from heapq import nsmallest
 from hashlib import sha256
 
+# cryptography
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PublicKey
+
 from qadom.rpcudp import RPCProtocol
 
 
@@ -48,13 +54,13 @@ def digest(bytes):
 
 class _Peer:
 
-    # equivalent to k in kademlia, also used as alpha. It specify the
-    # how many peers are returned in find_peers, how many peers will
-    # receive store calls to store a value and also the number of
-    # peers that are contacted when looking up peers in find_peers.
 
-    def __init__(self, uid, replication=REPLICATION_DEFAULT):
+    def __init__(self, uid, private_key, replication=REPLICATION_DEFAULT):
         assert replication <= REPLICATION_MAX
+        # equivalent to k in kademlia, also used as alpha. It specify the
+        # how many peers are returned in find_peers, how many peers will
+        # receive store calls to store a value and also the number of
+        # peers that are contacted when looking up peers in find_peers.
         self.replication = replication
         # keys associates a key with a list of key.  This can be
         # freely set by peers in the network and allows to link a well
@@ -82,6 +88,13 @@ class _Peer:
         # peer is responsible for. uid must be in the same space as
         # keys that is less than 2^256.
         self._uid = uid
+
+        # for use with namespace
+
+        # ed25519 private key (that includes the public key)
+        self._private_key = private_key
+        # store key/value pairs per public_key
+        self._namespace = defaultdict(dict)
 
     def close(self):
         self._transport.close()
@@ -223,6 +236,40 @@ class _Peer:
             peers = await self.find_peers(None, pack(key))
             return (b'PEERS', peers)
 
+    # namespace procedures
+
+    async def namespace_set(self, address, public_key, key, value, signature):
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return True
+        public = PublicKey.from_public_bytes(public_key)
+        try:
+            public.verify(signature, msgpack.packb((key, value)))
+        except InvalidSignature:
+            log.warning('invalid signature from %r', address)
+            # XXX: pretend everything is ok
+            return True
+        else:
+            # store it
+            self._namespace[unpack(public_key)][unpack(key)] = value
+            return True
+
+    async def namespace_get(self, address, public_key, key):
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
+
+        public = unpack(public_key)
+        if public in self._namespace:
+            try:
+                return (b'VALUE', self._namespace[public][unpack(key)])
+            except KeyError:
+                pass
+        # key not found, return nearest peers
+        uid = digest(msgpack.packb((public_key, key))
+        peers = await self.find_peers(None, pack(uid))
+        return (b'PEERS', peers)
+
     # local methods
 
     async def get(self, key):
@@ -305,6 +352,8 @@ class _Peer:
                 for peer, address in response:
                     await self.ping(tuple(address), peer)
 
+    # key local method
+
     async def key(self, key, value=None):
         """Key search and publish.
 
@@ -326,7 +375,6 @@ class _Peer:
         key = pack(key)
         value = pack(value)
         # find the nearest peers and call append rpc
-        key = pack(key)
         queried = set()
         while True:
             # find peers and remove already queried peers
@@ -384,8 +432,100 @@ class _Peer:
                     log.warning('unknown response %r from %r', response[0], address)
 
 
-async def make_peer(uid, port):
+    # namespace local method
+
+    async def namespace(self, key, value=None, public_key=None):
+        if value is None:
+            assert public_key is not None
+            out = await self._namespace_get(public_key, key)
+            return out
+        else:
+            await self._namespace_set(key, value)
+
+    async def _namespace_get(self, public_key, key):
+        uid = pack(digest(msgpack.packb((pack(public_key), pack(key)))))
+        queried = set()
+        while True:
+            # retrieve the k nearest peers and remove already queried peers
+            peers = await self.find_peers(None, key)
+            peers = [(uid, address) for (uid, address) in peers if unpack(uid) not in queried]
+            # no more peer to query, the key is not found
+            if not peers:
+                raise KeyError((public_key, key))
+            # query selected peers
+            queries = []
+            for _, address in peers:
+                query = self._protocol.rpc(tuple(address), 'namespace_get', public_key, key)
+                queries.append(query)
+            responses = await asyncio.gather(*queries, return_exceptions=True)
+            for (response, (peer, address)) in zip(responses, peers):
+                queried.add(unpack(peer))
+                if isinstance(response, Exception):
+                    continue
+                elif response[0] == b'VALUE':
+                    # TODO: check value's sha256
+                    value = response[1]
+                    self._namespace[public_key][unpack(key)] = value
+                    return value
+                elif response[0] == b'PEERS':
+                    for peer, address in response[1]:
+                        await self.ping(tuple(address), peer)
+                else:
+                    log.warning('unknown response %r from %r', response[0], address)
+
+    async def _namespace_set(self, key, value):
+        """Publish VALUE at KEY"""
+        key = pack(key)
+        value = pack(value)
+        # compute identifier of the node where to store that (key, value)
+        public = self._private_key.public_key().public_bytes()
+        uid = digest(msgpack.packb((public, key)))
+        # find the nearest peers and call namespace_set rpc
+        queried = set()
+        while True:
+            # find peers and remove already queried peers
+            peers = await self.find_peers(None, uid)
+            peers = [(x, address) for (x, address) in peers if unpack(x) not in queried]
+            # no more peer to query, the nearest peers in the network
+            # are known
+            if not peers:
+                # sign pair
+                payload = msgpack.packb((key, value))
+                signature = self._private_key.sign(payload)
+                # call rpc in nearest peers
+                peers = await self.find_peers(None, uid)
+                queries = []
+                for (_, address) in peers:
+                    query = self._protocol.rpc(
+                        tuple(address),
+                        'namespace_set',
+                        public,
+                        key,
+                        value,
+                        signature
+                    )
+                    queries.append(query)
+                # TODO: make sure replication is fullfilled
+                await asyncio.gather(*queries, return_exceptions=True)
+                return
+            # query selected peers
+            queries = []
+            for _, address in peers:
+                query = self._protocol.rpc(tuple(address), 'find_peers', uid)
+                queries.append(query)
+            responses = await asyncio.gather(*queries, return_exceptions=True)
+            for (response, (peer, address)) in zip(responses, peers):
+                queried.add(unpack(peer))
+                if isinstance(response, Exception):
+                    continue
+                for peer, address in response:
+                    await self.ping(tuple(address), peer)
+
+
+async def make_peer(uid, port, private_key=None):
     """Create a peer at PORT with UID as identifier"""
-    peer = _Peer(uid)
+    if private_key is None:
+        private_key = PrivateKey.generate()
+    peer = _Peer(uid, private_key)
     await peer.listen(port)
     return peer
