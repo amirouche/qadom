@@ -93,7 +93,7 @@ including `VALUE`.
 
 #### `peer.namespace(key, value)`
 
-`KEY` must be an integer below 2**256 and value must be bytes less
+`KEY` must be an integer below 2^256 and value must be bytes less
 than 8K. Store KEY and VALUE under the namespace described by the
 peer's public key.
 
@@ -103,7 +103,7 @@ to retrieve `VALUE`.
 #### `peer.namespace(key, public_key=public_key, signature=signature)`
 
 `KEY` and `PUBLIC_KEY` and `SIGNATURE` must be integers. `KEY` must be
-below 2**256.
+below 2^256.
 
 Returns the value associated with `PUBLIC_KEY` and `KEY` that match
 `SIGNATURE`.
