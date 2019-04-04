@@ -111,7 +111,7 @@ class _Peer:
         else:
             del self._addresses[address]
             del self._peers[uid]
-        self._blacklist.add(address)
+        self._blacklist.add(address[0])
 
     async def listen(self, port, interface='0.0.0.0'):
         """Start listening on the given port.
@@ -148,7 +148,7 @@ class _Peer:
 
     async def ping(self, address, uid):
         """Remote procedure that register the remote and returns the uid"""
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return pack(self._uid)
         uid = unpack(uid)
@@ -159,7 +159,7 @@ class _Peer:
 
     async def find_peers(self, address, uid):
         """Remote procedure that returns peers that are near UID"""
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return [random.randint(2**256) for x in range(self.replication)]
         # The code is riddle with unpack/pack calls because Peer
@@ -178,7 +178,7 @@ class _Peer:
     async def find_value(self, address, key):
         """Remote procedure that returns the associated value or peers that
         are near KEY"""
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
         log.debug("[%r] find value key=%r from %r", self._uid, key, address)
@@ -191,7 +191,7 @@ class _Peer:
     async def store(self, address, value):
         """Remote procedure that stores value locally with its digest as
         key"""
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return True
         log.debug("[%r] store from %r", self._uid, address)
@@ -214,7 +214,7 @@ class _Peer:
 
     async def add(self, address, key, value):
         """Remote procedure that adds VALUE to the list of uid at KEY"""
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return True
         log.debug("[%r] add key=%r value=%r from %r", self._uid, key, value, address)
@@ -233,7 +233,7 @@ class _Peer:
         """Remote procedure that returns values associated with KEY if any,
         otherwise return peers near KEY"""
         log.debug("[%r] search uid=%r from %r", self._uid, uid, address)
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
 
@@ -249,7 +249,7 @@ class _Peer:
     # namespace procedures
 
     async def namespace_set(self, address, public_key, key, value, signature):
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return True
         log.warning('namespace_set form %r', address)
@@ -267,7 +267,7 @@ class _Peer:
             return True
 
     async def namespace_get(self, address, public_key, key):
-        if address in self._blacklist:
+        if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
 
