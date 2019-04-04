@@ -97,15 +97,16 @@ including `VALUE`.
 than 8K. Store KEY and VALUE under the namespace described by the
 peer's public key.
 
-Use `peer.namespace(key, public_key=public_key)` to retrieve `VALUE`.
+Use `peer.namespace(key, public_key=public_key, signature=signature)`
+to retrieve `VALUE`.
 
-#### `peer.namespace(key, public_key=public_key)`
+#### `peer.namespace(key, public_key=public_key, signature=signature)`
 
-Both `KEY` and `PUBLIC_KEY` must be integers. `KEY` must be below
-2**256.
+`KEY` and `PUBLIC_KEY` and `SIGNATURE` must be integers. `KEY` must be
+below 2**256.
 
-Returns the value associated with `PUBLIC_KEY` and `KEY` in the
-network.
+Returns the value associated with `PUBLIC_KEY` and `KEY` that match
+`SIGNATURE`.
 
 
 ### RPC API

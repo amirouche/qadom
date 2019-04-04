@@ -441,18 +441,19 @@ class _Peer:
 
     # namespace local method
 
-    async def namespace(self, key, value=None, public_key=None):
+    async def namespace(self, key, value=None, public_key=None, signature=None):
         assert key <= 2**256
         if value is None:
             assert public_key is not None
             assert public_key <= 2**256
-            out = await self._namespace_get(public_key, key)
+            assert signature is not None
+            out = await self._namespace_get(public_key, key, signature)
             return out
         else:
             assert len(value) < 8000  # TODO: compute the actual max size
             await self._namespace_set(key, value)
 
-    async def _namespace_get(self, public_key, key):
+    async def _namespace_get(self, public_key, key, signature):
         uid = pack(digest(msgpack.packb((pack(public_key), pack(key)))))
         queried = set()
         while True:
@@ -473,10 +474,17 @@ class _Peer:
                 if isinstance(response, Exception):
                     continue
                 elif response[0] == b'VALUE':
-                    # TODO: check value's sha256
                     value = response[1]
-                    self._namespace[public_key][unpack(key)] = value
-                    return value
+                    public_key = PublicKey.from_public_bytes(pack(public_key))
+                    payload = msgpack((pack(key), value))
+                    try:
+                        public_key.verify(pack(signature), payload)
+                    except InvalidSignature:
+                        self.blacklist(address)
+                        continue
+                    else:
+                        self._namespace[public_key][unpack(key)] = value
+                        return value
                 elif response[0] == b'PEERS':
                     for peer, address in response[1]:
                     await self.ping(tuple(address), peer)
