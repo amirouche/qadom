@@ -11,6 +11,9 @@ from qadom.rpcudp import RPCProtocol
 log = logging.getLogger(__name__)
 
 
+REPLICATION_DEFAULT = 5  # TODO: increase
+
+
 def make_uid():
     """Create a wanna-be unique identifier. Return an integer."""
     return random.getrandbits(256)
@@ -46,9 +49,9 @@ class _Peer:
     # how many peers are returned in find_peers, how many peers will
     # receive store calls to store a value and also the number of
     # peers that are contacted when looking up peers in find_peers.
-    REPLICATION = 20
 
-    def __init__(self, uid):
+    def __init__(self, uid, replication=REPLICATION_DEFAULT):
+        self.replication = replication
         # keys associates a key with a list of key.  This can be
         # freely set by peers in the network and allows to link a well
         # known key to other keys. It is inspired from gnunet-fs
@@ -120,7 +123,7 @@ class _Peer:
         log.debug("find peers uid=%r from %r", uid, address)
         # XXX: if this takes more than 5 seconds (see RPCProtocol) it
         # will timeout in the other side.
-        uids = nearest(self.REPLICATION, self._peers.keys(), uid)
+        uids = nearest(self.replication, self._peers.keys(), uid)
         out = [(pack(uid), self._peers[uid]) for uid in uids]
         return out
 
@@ -231,7 +234,7 @@ class _Peer:
             if not peers:
                 peers = await self.find_peers(None, key)
                 queries = [self._protocol.rpc(tuple(address), 'store', value) for (_, address) in peers]
-                # TODO: make sure REPLICATION is fullfilled
+                # TODO: make sure replication is fullfilled
                 await asyncio.gather(*queries, return_exceptions=True)
                 return unpack(key)
             # query selected peers
@@ -279,7 +282,7 @@ class _Peer:
             if not peers:
                 peers = await self.find_peers(None, key)
                 queries = [self._protocol.rpc(tuple(x), 'append', key, value) for (_, x) in peers]
-                # TODO: make sure REPLICATION is fullfilled
+                # TODO: make sure replication is fullfilled
                 await asyncio.gather(*queries, return_exceptions=True)
                 return
             # query selected peers
