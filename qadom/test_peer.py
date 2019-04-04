@@ -26,9 +26,9 @@ class MockProtocol:
         self.peer = peer
 
     async def rpc(self, address, name, *args):
-        peer = self.network.peers[address]
+        peer = self.network.peers[address[0]]
         proc = getattr(peer, name)
-        out = await proc(self.peer._uid, *args)
+        out = await proc((self.peer._uid, None), *args)
         return out
 
 
@@ -56,10 +56,10 @@ async def test_bootstrap():
     assert len(one._peers) == 0
     assert len(two._peers) == 0
     # exec
-    await two.bootstrap(one._uid)
+    await two.bootstrap((one._uid, None))
     # check
-    assert two._peers == {one._uid: one._uid}
-    assert one._peers == {two._uid: two._uid}
+    assert two._peers == {one._uid: (one._uid, None)}
+    assert one._peers == {two._uid: (two._uid, None)}
 
 
 
@@ -78,8 +78,8 @@ async def test_dict():
     three = make_peer()
     network.add(three)
 
-    await two.bootstrap(one._uid)
-    await three.bootstrap(one._uid)
+    await two.bootstrap((one._uid, None))
+    await three.bootstrap((one._uid, None))
 
     out = await three.set(value)
     assert out == key
@@ -100,21 +100,21 @@ async def test_dict():
     one = make_peer()
     network.add(one)
     # use KEY as uid
-    two = make_peer(key)
+    two = make_peer()
     network.add(two)
     three = make_peer()
     network.add(three)
 
-    await two.bootstrap(one._uid)
-    await three.bootstrap(one._uid)
+    await two.bootstrap((one._uid, None))
+    await three.bootstrap((one._uid, None))
 
     out = await three.set(value)
-    assert out == key
-    assert two._storage[key] == value
 
-    # one is the only node not storing the value locally
-    out = await one.get(key)
-    assert out == value
+    # check
+    assert out == key
+    for xxx in (one, two, three):
+        out = await xxx.get(key)
+        assert out == value
 
 
 @pytest.mark.asyncio
@@ -132,10 +132,10 @@ async def test_bag():
     four = make_peer(4)
     network.add(four)
 
-    await zero.bootstrap(one._uid)
-    await two.bootstrap(one._uid)
-    await three.bootstrap(one._uid)
-    await four.bootstrap(one._uid)
+    await zero.bootstrap((one._uid, None))
+    await two.bootstrap((one._uid, None))
+    await three.bootstrap((one._uid, None))
+    await four.bootstrap((one._uid, None))
 
     # exec
     await three.bag(4, 2006)
@@ -170,10 +170,10 @@ async def test_namespace():
     four = make_peer()
     network.add(four)
 
-    await one.bootstrap(zero._uid)
-    await two.bootstrap(zero._uid)
-    await three.bootstrap(zero._uid)
-    await four.bootstrap(zero._uid)
+    await one.bootstrap((zero._uid, None))
+    await two.bootstrap((zero._uid, None))
+    await three.bootstrap((zero._uid, None))
+    await four.bootstrap((zero._uid, None))
 
     # exec
     key = 2006
