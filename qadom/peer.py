@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 
 
 REPLICATION_DEFAULT = 5  # TODO: increase
+REPLICATION_MAX = 20
 
 
 def make_uid():
@@ -53,6 +54,7 @@ class _Peer:
     # peers that are contacted when looking up peers in find_peers.
 
     def __init__(self, uid, replication=REPLICATION_DEFAULT):
+        assert replication <= REPLICATION_MAX
         self.replication = replication
         # keys associates a key with a list of key.  This can be
         # freely set by peers in the network and allows to link a well
@@ -145,9 +147,20 @@ class _Peer:
         """Remote procedure that stores value locally with its digest as
         key"""
         log.debug("store from %r", address)
-        key = unpack(sha256(value).digest())
-        self._storage[key] = value
-        return True
+        key = digest(value)
+        # check that peer is near the key
+        peers = self.find_peers(None, pack(key))
+        peers = nearest(REPLICATION_MAX, peers, key)
+        high = peers[-1] ^ key
+        current = self._uid ^ key
+        if current > high:
+            log.warning('received a value that is too far from %r', address)
+            # XXX: pretend the value was stored
+            # TODO: blacklist address
+            return True
+        else:
+            self._storage[key] = value
+            return True
 
     # keys procedures
 
