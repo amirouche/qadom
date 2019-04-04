@@ -123,8 +123,10 @@ class _Peer:
         self._protocol.register(self.find_peers)
         self._protocol.register(self.find_value)
         self._protocol.register(self.store)
-        self._protocol.register(self.append)
+        self._protocol.register(self.add)
         self._protocol.register(self.search)
+        self._protocol.register(self.namespace_get)
+        self._protocol.register(self.namespace_set)
 
     async def bootstrap(self, address):
         """Add address to the list of peers.
@@ -487,7 +489,7 @@ class _Peer:
                         return value
                 elif response[0] == b'PEERS':
                     for peer, address in response[1]:
-                    await self.ping(tuple(address), peer)
+                        await self.ping(tuple(address), peer)
                 else:
                     log.warning('unknown response %r from %r', response[0], address)
 

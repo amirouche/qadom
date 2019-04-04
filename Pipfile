@@ -5,6 +5,12 @@ verify_ssl = true
 
 [dev-packages]
 ipython = "*"
+pytest = "*"
+pytest-asyncio = "*"
+pylama = "*"
+bandit = "*"
+pre-commit = "*"
+pytest-cov = "*"
 
 [packages]
 msgpack-python = "*"
