@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import random
+import operator
+import functools
 from collections import defaultdict
 from heapq import nsmallest
 from hashlib import sha256
@@ -25,7 +27,7 @@ def nearest(k, peers, uid):
     # of peers and the time it takes to compute the nearest peers will
     # timeout after 5 seconds on the other side. See RPCProtocol and
     # Peer.find_peers.
-    return nsmallest(k, peers, key=lambda x: x ^ uid)
+    return nsmallest(k, peers, key=functools.partial(operator.xor, uid))
 
 
 def pack(integer):
