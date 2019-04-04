@@ -94,7 +94,7 @@ class _Peer:
         else:
             del self._addresses[address]
             del self._peers[uid]
-        self._blacklist.add(uid)
+        self._blacklist.add(address)
 
     async def listen(self, port, interface='0.0.0.0'):
         """Start listening on the given port.
@@ -127,6 +127,9 @@ class _Peer:
 
     async def ping(self, address, uid):
         """Remote procedure that register the remote and returns the uid"""
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return self._uid
         uid = unpack(uid)
         log.debug("ping uid=%r from %r", uid, address)
         self._peers[uid] = address
@@ -135,6 +138,9 @@ class _Peer:
 
     async def find_peers(self, address, uid):
         """Remote procedure that returns peers that are near UID"""
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return [random.randint(2**256) for x in range(self.replication)]
         # The code is riddle with unpack/pack calls because Peer
         # stores key/uid as integer and msgpack doesn't accept such
         # big integers hence it is required to pass them as bytes.
@@ -151,6 +157,9 @@ class _Peer:
     async def find_value(self, address, key):
         """Remote procedure that returns the associated value or peers that
         are near KEY"""
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
         log.debug("find value from %r key=%r", address, key)
         try:
             return (b'VALUE', self._storage[unpack(key)])
@@ -161,6 +170,9 @@ class _Peer:
     async def store(self, address, value):
         """Remote procedure that stores value locally with its digest as
         key"""
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return True
         log.debug("store from %r", address)
         key = digest(value)
         # check that peer is near the key
@@ -181,15 +193,28 @@ class _Peer:
 
     async def append(self, address, key, value):
         """Remote procedure that appends VALUE to the list of uid at KEY"""
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return True
         log.debug("append key=%r value=%r from %r", key, value, address)
-        # TODO: check valid
-        self._keys[unpack(key)].append(unpack(value))
-        return True
+        # TODO: do more validation and blacklist if error
+        key = unpack(key)
+        value = unpack(value)
+        if key > 2**256 or value > 2**256:
+            self.blacklist(address)
+            # XXX: pretend everything is ok
+            return True
+        else:
+            self._keys[key].append(value)
+            return True
 
     async def search(self, address, key):
         """Remote procedure that returns values associated with KEY if any,
         otherwise return peers near KEY"""
         log.debug("search key=%r from %r", key, address)
+        if address in self._blacklist:
+            # XXX: pretend everything is ok
+            return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
         key = unpack(key)
         if key in self._keys:
             values = [pack(v) for v in self._keys[key]]
