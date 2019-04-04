@@ -66,6 +66,9 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, datagram, address):
         log.debug("received datagram from %s", address)
+        if len(datagram) > 8192:
+            log.warning('received big datagram from %r', address)
+            return
 
         try:
             uid, type, data = msgpack.unpackb(datagram)
