@@ -171,7 +171,7 @@ class _Peer:
         # TODO: optimize and make it part of Peer.refresh()
         for root in iter_roots(UID_LENGTH):
             try:
-                self._get(root)
+                await self._get(root)
             except KeyError:
                 pass
 
