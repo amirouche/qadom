@@ -18,6 +18,7 @@ SEED = random.randint(0, 2**1024)
 with open('SEED.txt', 'w') as f:
     f.write(str(SEED))
 
+
 random.seed(SEED)
 
 
@@ -69,34 +70,6 @@ async def test_bootstrap():
     # check
     assert two._peers == {one._uid: (one._uid, None)}
     assert one._peers == {two._uid: (two._uid, None)}
-
-
-
-@pytest.mark.asyncio
-async def test_dict():
-    # setup
-    value = b'test value'
-    key = peer.digest(value)
-    # make network and peers
-    network = MockNetwork()
-    one = make_peer()
-    network.add(one)
-    # use KEY as uid
-    two = make_peer(key)
-    network.add(two)
-    three = make_peer()
-    network.add(three)
-
-    await two.bootstrap((one._uid, None))
-    await three.bootstrap((one._uid, None))
-
-    out = await three.set(value)
-    assert out == key
-    assert two._storage[key] == value
-
-    # one is the only node not storing the value locally
-    out = await one.get(key)
-    assert out == value
 
 
 @pytest.mark.asyncio
