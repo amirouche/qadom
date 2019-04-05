@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 
@@ -97,9 +98,13 @@ async def test_dict():
 
     # check
     assert out == key
+    queries = []
     for xxx in (one, two, three, four):
-        out = await xxx.get(key)
-        assert out == value
+        query = xxx.get(key)
+        queries.append(query)
+
+    out = await asyncio.gather(*queries, return_exceptions=True)
+    assert out == [value, value, value, value]
 
 
 @pytest.mark.asyncio
