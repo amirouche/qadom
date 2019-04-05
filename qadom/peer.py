@@ -24,6 +24,13 @@ REPLICATION_DEFAULT = 5  # TODO: increase
 REPLICATION_MAX = 20
 
 
+async def gather(mapping, **kwargs):
+    """Like asyncio.gather but takes dict as argument"""
+    coroutines = list(mapping.values())
+    results = await asyncio.gather(*coroutines, **kwargs)
+    return dict(zip(mapping.keys(), results))
+
+
 def make_uid():
     """Create a wanna-be unique identifier. Return an integer."""
     return random.getrandbits(256)
@@ -285,6 +292,21 @@ class _Peer:
         peers = await self.peers((None, None), pack(uid))
         return (b'PEERS', peers)
 
+    # helper
+
+    async def _welcome_peers(self, addresses):
+        queries = dict()
+        for address in addresses:
+            query = self._protocol.rpc(address, 'ping', pack(self._uid))
+            queries[address] = query
+        responses = await gather(queries, return_exceptions=True)
+        for (address, maybe_uid) in responses.items():
+            if isinstance(maybe_uid, Exception):
+                continue
+            uid = unpack(maybe_uid)
+            self._peers[uid] = address
+            self._addresses[address] = uid
+
     # local methods
 
     async def get(self, key):
@@ -310,12 +332,12 @@ class _Peer:
             if not peers:
                 raise KeyError(unpack(uid))
             # query selected peers
-            queries = []
+            queries = dict()
             for address in peers:
                 query = self._protocol.rpc(address, 'value', uid)
-                queries.append(query)
-            responses = await asyncio.gather(*queries, return_exceptions=True)
-            for (response, address) in zip(responses, peers):
+                queries[address] = query
+            responses = await gather(queries, return_exceptions=True)
+            for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
@@ -329,12 +351,7 @@ class _Peer:
                         self.blacklist(address)
                         continue
                 elif response[0] == b'PEERS':
-                    # TODO: use gather
-                    for address in response[1]:
-                        new = await self._protocol.rpc(address, 'ping', pack(self._uid))
-                        new = unpack(new)
-                        self._peers[new] = address
-                        self._addresses[address] = new
+                    await self._welcome_peers(response[1])
                 else:
                     log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
 
@@ -363,21 +380,16 @@ class _Peer:
                 await asyncio.gather(*queries, return_exceptions=True)
                 return unpack(uid)
             # query selected peers
-            queries = []
+            queries = dict()
             for address in peers:
                 query = self._protocol.rpc(address, 'peers', uid)
-                queries.append(query)
-            responses = await asyncio.gather(*queries, return_exceptions=True)
-            for (response, address) in zip(responses, peers):
+                queries[address] = query
+            responses = await gather(queries, return_exceptions=True)
+            for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
-                # TODO: use gather
-                for address in response:
-                    new = await self._protocol.rpc(address, 'ping', pack(self._uid))
-                    new = unpack(new)
-                    self._peers[new] = address
-                    self._addresses[address] = new
+                await self._welcome_peers(response)
 
     # key local method
 
@@ -416,20 +428,16 @@ class _Peer:
                 await asyncio.gather(*queries, return_exceptions=True)
                 return
             # query selected peers
-            queries = []
+            queries = dict()
             for address in peers:
                 query = self._protocol.rpc(address, 'peers', uid)
-                queries.append(query)
-            responses = await asyncio.gather(*queries, return_exceptions=True)
-            for (response, address) in zip(responses, peers):
+                queries[address] = query
+            responses = await gather(queries, return_exceptions=True)
+            for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
-                for address in response:
-                    new = await self._protocol.rpc(address, 'ping', pack(self._uid))
-                    new = unpack(new)
-                    self._peers[new] = address
-                    self._addresses[address] = new
+                await self._welcome_peers(response)
 
     async def _search(self, key):
         """Search values associated with KEY"""
@@ -444,12 +452,12 @@ class _Peer:
             if not peers:
                 return out
             # query selected peers
-            queries = []
+            queries = dict()
             for address in peers:
                 query = self._protocol.rpc(address, 'search', key)
-                queries.append(query)
-            responses = await asyncio.gather(*queries, return_exceptions=True)
-            for (response, address) in zip(responses, peers):
+                queries[address] = query
+            responses = await gather(queries, return_exceptions=True)
+            for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
@@ -457,11 +465,7 @@ class _Peer:
                     values = set([unpack(x) for x in response[1]])
                     out = out.union(values)
                 elif response[0] == b'PEERS':
-                    for address in response[1]:
-                        uid = await self._protocol.rpc(address, 'ping', pack(self._uid))
-                        uid = unpack(uid)
-                        self._peers[uid] = address
-                        self._addresses[address] = address
+                    await self._welcome_peers(response[1])
                 else:
                     log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
 
@@ -493,12 +497,12 @@ class _Peer:
             if not peers:
                 raise KeyError((unpack(public_key), unpack(key)))
             # query selected peers
-            queries = []
+            queries = dict()
             for address in peers:
                 query = self._protocol.rpc(address, 'namespace_get', public_key, key)
-                queries.append(query)
-            responses = await asyncio.gather(*queries, return_exceptions=True)
-            for (response, address) in zip(responses, peers):
+                queries[address] = query
+            responses = await gather(queries, return_exceptions=True)
+            for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
@@ -509,18 +513,14 @@ class _Peer:
                     try:
                         public_key_object.verify(signature, payload)
                     except InvalidSignature:
-                        self.warning('invalid namespace set form %r', address)
+                        self.warning('invalid namespace set from %r', address)
                         self.blacklist(address)
                         continue
                     else:
                         self._namespace[public_key][unpack(key)] = value
                         return value
                 elif response[0] == b'PEERS':
-                    for address in response[1]:
-                        new = await self._protocol.rpc(address, 'ping', pack(self._uid))
-                        new = unpack(new)
-                        self._peers[new] = address
-                        self._addresses[address] = new
+                    await self._welcome_peers(response[1])
                 else:
                     log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
 
@@ -562,20 +562,16 @@ class _Peer:
                 await asyncio.gather(*queries, return_exceptions=True)
                 return signature
             # query selected peers
-            queries = []
+            queries = dict()
             for address in peers:
                 query = self._protocol.rpc(address, 'peers', uid)
-                queries.append(query)
-            responses = await asyncio.gather(*queries, return_exceptions=True)
-            for (response, address) in zip(responses, peers):
+                queries[address] = query
+            responses = await gather(queries, return_exceptions=True)
+            for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
-                for address in response:
-                    new = await self._protocol.rpc(address, 'ping', pack(self._uid))
-                    new = unpack(new)
-                    self._peers[new] = address
-                    self._addresses[address] = new
+                await self._welcome_peers(response)
 
 
 async def make_peer(uid, port, private_key=None):
