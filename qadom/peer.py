@@ -175,14 +175,9 @@ class _Peer:
             return pack(self._uid)
         uid = unpack(uid)
         log.debug("[%r] ping uid=%r from %r", self._uid, uid, address)
-        if uid == self._uid:
-            # We are try to add self to self's routing table...
-            # TODO: Explain why it is a bad idea.
-            return pack(self._uid)
-        else:
-            self._peers[uid] = address
-            self._addresses[address] = uid
-            return pack(self._uid)
+        self._peers[uid] = address
+        self._addresses[address] = uid
+        return pack(self._uid)
 
     async def peers(self, address, uid):
         """Remote procedure that returns peers that are near UID"""
@@ -332,11 +327,8 @@ class _Peer:
             if isinstance(maybe_uid, Exception):
                 continue
             uid = unpack(maybe_uid)
-            if uid == self._uid:
-                continue
-            else:
-                self._peers[uid] = address
-                self._addresses[address] = uid
+            self._peers[uid] = address
+            self._addresses[address] = uid
 
     # local methods
 
