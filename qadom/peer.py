@@ -249,9 +249,7 @@ class _Peer:
             return True
         else:
             log.warning('[%r] received a value that is too far, by %r', self._uid, address)
-            self.blacklist(address)
-            # XXX: pretend everything is ok
-            return True
+            return False
 
     # bag procedures
 
@@ -266,9 +264,7 @@ class _Peer:
         value = unpack(value)
         if key > 2**UID_LENGTH or value > 2**UID_LENGTH:
             log.warning('[%r] received a add that is invalid, from %r', self._uid, address)
-            self.blacklist(address)
-            # XXX: pretend everything is ok
-            return True
+            return False
 
         ok = await self._is_near(key)
         if ok:
@@ -276,9 +272,7 @@ class _Peer:
             return True
         else:
             log.warning('[%r] received a add that is too far, by %r', self._uid, address)
-            self.blacklist(address)
-            # XXX: pretend the value was stored
-            return True
+            return False
 
     async def search(self, address, uid):
         """Remote procedure that returns values associated with KEY if any,
@@ -311,6 +305,7 @@ class _Peer:
             try:
                 public.verify(signature, msgpack.packb((key, value)))
             except InvalidSignature:
+                self.blacklist(address)
                 log.warning('[%r] invalid signature from %r', self._uid, address)
                 # XXX: pretend everything is ok
                 return True
@@ -319,10 +314,8 @@ class _Peer:
                 self._namespace[public_key][unpack(key)] = value
                 return True
         else:
-            self.blacklist(address)
             log.warning('[%r] received namespace_set that is too far, by %r', self._uid, address)
-            # XXX: pretend everything is ok
-            return True
+            return False
 
     async def namespace_get(self, address, public_key, key):
         if address[0] in self._blacklist:
