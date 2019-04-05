@@ -1,4 +1,5 @@
 import logging
+import random
 
 import daiquiri
 import pytest
@@ -10,6 +11,14 @@ from qadom import peer
 
 
 daiquiri.setup(logging.DEBUG, outputs=('stderr',))
+
+# randomize test but make it reproducible
+SEED = random.randint(0, 2**1024)
+
+with open('SEED.txt', 'w') as f:
+    f.write(str(SEED))
+
+random.seed(SEED)
 
 
 def make_peer(uid=None):
@@ -99,20 +108,23 @@ async def test_dict():
     network = MockNetwork()
     one = make_peer()
     network.add(one)
-    # use KEY as uid
     two = make_peer()
     network.add(two)
     three = make_peer()
     network.add(three)
+    four = make_peer()
+    network.add(four)
 
     await two.bootstrap((one._uid, None))
     await three.bootstrap((one._uid, None))
+    await four.bootstrap((three._uid, None))
 
+    # exec
     out = await three.set(value)
 
     # check
     assert out == key
-    for xxx in (one, two, three):
+    for xxx in (one, two, three, four):
         out = await xxx.get(key)
         assert out == value
 
@@ -144,15 +156,10 @@ async def test_bag():
     # check
     assert four._bag == {4: {42, 2006}}
 
-    out = await one.bag(4)
-    assert out == {42, 2006}
-    out = await one.bag(4)
-    assert out == {42, 2006}
+    for xxx in [zero, one, two, three, four]:
+        out = await xxx.bag(4)
+        assert out == {42, 2006}
 
-    out = await zero.bag(4)
-    assert out == {42, 2006}
-    out = await zero.bag(4)
-    assert out == {42, 2006}
 
 
 @pytest.mark.asyncio
