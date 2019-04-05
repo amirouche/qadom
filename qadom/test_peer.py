@@ -4,31 +4,39 @@ import random
 import os
 
 import daiquiri
-import pytest
+import json
 import msgpack
+import networkx as nx
+import pytest
 
 from cryptography.hazmat.primitives import serialization
 
 from qadom import peer
 
 
-daiquiri.setup(logging.DEBUG, outputs=('stderr',))
+daiquiri.setup(logging.INFO, outputs=('stderr',))
 log = logging.getLogger(__name__)
 
 
-# randomize test but make it reproducible
-SEED = random.randint(0, 2**8192)
+# randomize tests but make it predictable
+SEED = os.environ.get('QADOM_SEED')
+if SEED is None:
+    PEER_COUNT_MAX = 10**2
+    SEED = {
+        'RANDOM_SEED': random.getrandbits(2048),
+        'PEER_COUNT': random.randint(PEER_COUNT_MAX // 3, PEER_COUNT_MAX),
+    }
+else:
+    with open(SEED) as f:
+        SEED = json.load(f)
 
 
-with open('SEED.txt', 'w') as f:
-    f.write(str(SEED))
+RANDOM_SEED = SEED['RANDOM_SEED']
+random.seed(RANDOM_SEED)
+PEER_COUNT = SEED['PEER_COUNT']
 
-random.seed(SEED)
-
-
-# choosen so that tests don't run for too long
-PEER_COUNT_MAX = os.environ.get('QADOM_PEER_COUNT_MAX')
-PEER_COUNT_MAX = int(os.environ['QADOM_PEER_COUNT_MAX']) if PEER_COUNT_MAX else 10**5
+with open('SEED.json', 'w') as f:
+    json.dump(SEED, f)
 
 
 def make_peer(uid=None):
@@ -64,26 +72,39 @@ class MockNetwork:
         return random.choice(list(self.peers.values()))
 
 
-def make_network():
+async def make_network():
+    log.info("network size=%r", PEER_COUNT)
+    graph = nx.barabasi_albert_graph(PEER_COUNT, 5, RANDOM_SEED)
     network = MockNetwork()
-    count = random.randint(PEER_COUNT_MAX // 3, PEER_COUNT_MAX)
-    log.info("network size=%r", count)
-    for i in range(count):
+    peers = dict()
+    for node in graph.nodes:
         peer = make_peer()
         network.add(peer)
+        peers[node] = peer
+    for node, peer in peers.items():
+        for neighbor in graph.neighbors(node):
+            neighbor = peers[neighbor]
+            await peer.bootstrap((peer._uid, None))
+
     return network
 
 
+cached_network = None
+
 @pytest.mark.asyncio
-async def test_bootstrap():
+@pytest.fixture()  # scope=module doesn't work with asyncio
+async def network():
+    global cached_network
+    if cached_network is None:
+        cached_network = await make_network()
+    return cached_network
+
+
+@pytest.mark.asyncio
+async def test_bootstrap(network):
     # setup
-    network = make_network()
     one = network.choice()
     two = network.choice()
-
-    # pre-check
-    assert len(one._peers) == 0
-    assert len(two._peers) == 0
 
     # exec
     await two.bootstrap((one._uid, None))
@@ -94,12 +115,11 @@ async def test_bootstrap():
 
 
 @pytest.mark.asyncio
-async def test_dict():
+async def test_dict(network):
     # setup
     value = b'test value'
     key = peer.hash(value)
     # make network and peers
-    network = make_network()
     one = network.choice()
     two = network.choice()
     three = network.choice()
@@ -123,12 +143,11 @@ async def test_dict():
 
 
 @pytest.mark.asyncio
-async def test_bootstrap_node_doesnt_know_everybody():
+async def test_bootstrap_node_doesnt_know_everybody(network):
     # setup
     value = b'test value'
     key = peer.hash(value)
     # make network and peers
-    network = make_network()
     one = network.choice()
     two = network.choice()
     three = network.choice()
@@ -160,9 +179,8 @@ async def test_bootstrap_node_doesnt_know_everybody():
 
 
 @pytest.mark.asyncio
-async def test_bag():
+async def test_bag(network):
     # setup
-    network = make_network()
     zero = network.choice()
     one = network.choice()  # bootstrap node
     two = network.choice()
@@ -196,9 +214,8 @@ async def test_bag():
 
 
 @pytest.mark.asyncio
-async def test_namespace():
+async def test_namespace(network):
     # setup
-    network = make_network()
     zero = network.choice()  # bootstrap node
     one = network.choice()
     two = network.choice()

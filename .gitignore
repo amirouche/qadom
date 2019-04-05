@@ -3,5 +3,5 @@ __pycache__
 .coverage
 coverage.xml
 htmlcov
-SEED.txt
+SEED.json
 *log

@@ -12,13 +12,13 @@ bandit = "*"
 pre-commit = "*"
 pytest-cov = "*"
 debug = "*"
+networkx = "*"
 
 [packages]
 msgpack-python = "*"
 pytest = "*"
 daiquiri = "*"
 cryptography = "*"
-bases-py = "*"
 
 [requires]
 python_version = "3.6"
