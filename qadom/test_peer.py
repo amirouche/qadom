@@ -42,7 +42,7 @@ with open('SEED.json', 'w') as f:
 def make_peer(uid=None):
     uid = uid if uid is not None else peer.make_uid()
     private_key = peer.PrivateKey.generate()
-    out = peer._Peer(uid, private_key, 1)
+    out = peer._Peer(uid, private_key, replication=3)
     return out
 
 
@@ -74,7 +74,7 @@ class MockNetwork:
 
 async def make_social_network():
     log.info("network size=%r", PEER_COUNT)
-    graph = nx.barabasi_albert_graph(PEER_COUNT, PEER_COUNT % 5, RANDOM_SEED)
+    graph = nx.barabasi_albert_graph(PEER_COUNT, 1 + PEER_COUNT % 5, RANDOM_SEED)
     network = MockNetwork()
     peers = dict()
     for node in graph.nodes:
@@ -180,44 +180,6 @@ async def test_dict(make_network):
         queries.append(query)
     out = await asyncio.gather(*queries, return_exceptions=True)
     assert out == [value, value, value, value]
-
-
-@pytest.mark.parametrize("make_network", NETWORK_MAKERS)
-@pytest.mark.asyncio
-async def test_bootstrap_node_doesnt_know_everybody(make_network):
-    network = await make_network()
-    # setup
-    value = b'test value'
-    key = peer.hash(value)
-    # make network and peers
-    one = network.choice()
-    two = network.choice()
-    three = network.choice()
-    four = network.choice()
-
-    await two.bootstrap((one._uid, None))
-    await three.bootstrap((one._uid, None))
-    await four.bootstrap((three._uid, None))
-
-    # exec
-    out = await three.set(value)
-
-    # check
-    assert out == key
-    queries = dict()
-    for xxx in (one, two, three, four):
-        query = xxx.get(key)
-        queries[xxx] = query
-    canonical = await peer.gather(queries, return_exceptions=True)
-
-    fallback = {}
-    for xxx, response in canonical.items():
-        if isinstance(response, Exception):
-            fallback[xxx] = xxx.get_at(key, three._uid)
-    if fallback:
-        log.warning('fallback')
-        out = await peer.gather(fallback, return_exceptions=True)
-        assert list(out.values()) == [value] * len(out)
 
 
 @pytest.mark.parametrize("make_network", NETWORK_MAKERS)
