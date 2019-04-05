@@ -33,7 +33,7 @@ async def gather(mapping, **kwargs):
 
 def make_uid():
     """Create a wanna-be unique identifier. Return an integer."""
-    return random.getrandbits(256)
+    return random.getrandbits(UID_LENGTH)
 
 
 def nearest(k, peers, uid):
@@ -55,9 +55,18 @@ def unpack(bytes):
     return int.from_bytes(bytes, byteorder='big')
 
 
-def digest(bytes):
+def hash(bytes):
     """Return the sha256 of BYTES as an integer"""
     return unpack(sha256(bytes).digest())
+
+
+UID_LENGTH = len(bin(hash(b''))) - 2
+print(UID_LENGTH)
+
+
+def iter_roots(count):
+    for i in range(count):
+        yield 2**i
 
 
 class _Peer:
@@ -151,6 +160,20 @@ class _Peer:
         uid = unpack(uid)
         self._peers[uid] = address
         self._addresses[address] = uid
+        await self._connect()
+
+    async def _connect(self):
+        # XXX: This is a tentative to populate the routing table with
+        # enough nodes to cover 2^UID_LENGTH space and avoid lookup
+        # KeyError because there is part of the space that self can
+        # not reach
+
+        # TODO: optimize and make it part of Peer.refresh()
+        for root in iter_roots(UID_LENGTH):
+            try:
+                self._get(root)
+            except KeyError:
+                pass
 
     # helper
 
@@ -183,7 +206,7 @@ class _Peer:
         """Remote procedure that returns peers that are near UID"""
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return [random.randint(2**256) for x in range(self.replication)]
+            return [random.randint(2**UID_LENGTH) for x in range(self.replication)]
         # The code is riddle with unpack/pack calls because Peer
         # stores key/uid as integer and msgpack doesn't accept such
         # big integers hence it is required to pass them as bytes.
@@ -202,7 +225,7 @@ class _Peer:
         are near KEY"""
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
+            return (b'PEERS', [random.randint(2**UID_LENGTH) for x in range(self.replication)])
         log.debug("[%r] find value key=%r from %r", self._uid, key, address)
         try:
             return (b'VALUE', self._storage[unpack(key)])
@@ -217,7 +240,7 @@ class _Peer:
             # XXX: pretend everything is ok
             return True
         log.debug("[%r] store from %r", self._uid, address)
-        uid = digest(value)
+        uid = hash(value)
 
         ok = await self._is_near(uid)
         if ok:
@@ -240,7 +263,7 @@ class _Peer:
         log.debug("[%r] add key=%r value=%r from %r", self._uid, key, value, address)
         key = unpack(key)
         value = unpack(value)
-        if key > 2**256 or value > 2**256:
+        if key > 2**UID_LENGTH or value > 2**UID_LENGTH:
             log.warning('[%r] received a add that is invalid, from %r', self._uid, address)
             self.blacklist(address)
             # XXX: pretend everything is ok
@@ -262,7 +285,7 @@ class _Peer:
         log.debug("[%r] search uid=%r from %r", self._uid, uid, address)
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
+            return (b'PEERS', [random.randint(2**UID_LENGTH) for x in range(self.replication)])
 
         uid = unpack(uid)
         if uid in self._bag:
@@ -279,7 +302,7 @@ class _Peer:
             # XXX: pretend everything is ok
             return True
         log.debug('namespace_set form %r', address)
-        uid = digest(msgpack.packb((public_key, key)))
+        uid = hash(msgpack.packb((public_key, key)))
 
         ok = await self._is_near(uid)
         if ok:
@@ -303,7 +326,7 @@ class _Peer:
     async def namespace_get(self, address, public_key, key):
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
+            return (b'PEERS', [random.randint(2**UID_LENGTH) for x in range(self.replication)])
 
         if public_key in self._namespace:
             try:
@@ -311,7 +334,7 @@ class _Peer:
             except KeyError:
                 pass
         # key not found, return nearest peers
-        uid = digest(msgpack.packb((public_key, key)))
+        uid = hash(msgpack.packb((public_key, key)))
         peers = await self.peers((None, None), pack(uid))
         return (b'PEERS', peers)
 
@@ -336,7 +359,7 @@ class _Peer:
         """Local method to fetch the value associated with KEY
 
         KEY must be an integer below 2^256"""
-        assert key <= 2**256
+        assert key <= 2**UID_LENGTH
         try:
             return self._storage[key]
         except KeyError:
@@ -366,7 +389,7 @@ class _Peer:
                     continue
                 elif response[0] == b'VALUE':
                     value = response[1]
-                    if digest(value) == unpack(uid):
+                    if hash(value) == unpack(uid):
                         self._storage[unpack(uid)] = value
                         return value
                     else:
@@ -386,7 +409,7 @@ class _Peer:
         if len(value) > (8192 - 28):  # datagram max size minus
                                       # "header", see RPCProtocol.
             raise ValueError('value too big')
-        uid = pack(digest(value))
+        uid = pack(hash(value))
         # unlike kademlia store value locally
         self._storage[unpack(uid)] = value
         # find the nearest peers and call store rpc
@@ -504,7 +527,7 @@ class _Peer:
     # namespace local method
 
     async def namespace(self, key, value=None, public_key=None, signature=None):
-        assert key <= 2**256
+        assert key <= 2**UID_LENGTH
         if value is None:
             assert isinstance(public_key, bytes)
             assert isinstance(signature, bytes)
@@ -527,7 +550,7 @@ class _Peer:
                 return out
         # proceed
         key = pack(key)
-        uid = pack(digest(msgpack.packb((public_key, key))))
+        uid = pack(hash(msgpack.packb((public_key, key))))
         queried = set()
         while True:
             # retrieve the k nearest peers and remove already queried peers
@@ -573,7 +596,7 @@ class _Peer:
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw
         )
-        uid = pack(digest(msgpack.packb((public_key, key))))
+        uid = pack(hash(msgpack.packb((public_key, key))))
         # find the nearest peers and call namespace_set rpc
         queried = set()
         while True:
