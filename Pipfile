@@ -19,6 +19,8 @@ msgpack-python = "*"
 pytest = "*"
 daiquiri = "*"
 cryptography = "*"
+hoply = "*"
+plyvel = "*"
 
 [requires]
 python_version = "3.6"
