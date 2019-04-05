@@ -14,13 +14,17 @@ from qadom import peer
 daiquiri.setup(logging.DEBUG, outputs=('stderr',))
 
 # randomize test but make it reproducible
-SEED = random.randint(0, 2**1024)
+SEED = random.randint(0, 2**8192)
 
 with open('SEED.txt', 'w') as f:
     f.write(str(SEED))
 
 
 random.seed(SEED)
+
+
+# choosen so that tests don't run for too long
+PEER_COUNT_MAX = 10**5
 
 
 def make_peer(uid=None):
@@ -52,22 +56,33 @@ class MockNetwork:
         peer._protocol = MockProtocol(self, peer)
         self.peers[peer._uid] = peer
 
+    def choice(self):
+        return random.choice(list(self.peers.values()))
+
+
+def make_network():
+    network = MockNetwork()
+    count = random.randint(PEER_COUNT_MAX // 3, PEER_COUNT_MAX)
+    for i in range(count):
+        peer = make_peer()
+        network.add(peer)
+    return network
 
 
 @pytest.mark.asyncio
 async def test_bootstrap():
     # setup
-    network = MockNetwork()
-    one = make_peer()
-    network.add(one)
-    two = make_peer()
-    network.add(two)
+    network = make_network()
+    one = network.choice()
+    two = network.choice()
 
     # pre-check
     assert len(one._peers) == 0
     assert len(two._peers) == 0
+
     # exec
     await two.bootstrap((one._uid, None))
+
     # check
     assert two._peers == {one._uid: (one._uid, None)}
     assert one._peers == {two._uid: (two._uid, None)}
@@ -79,14 +94,48 @@ async def test_dict():
     value = b'test value'
     key = peer.digest(value)
     # make network and peers
-    network = MockNetwork()
-    one = make_peer()
+    network = make_network()
+    one = network.choice()
     network.add(one)
-    two = make_peer()
+    two = network.choice()
     network.add(two)
-    three = make_peer()
+    three = network.choice()
     network.add(three)
-    four = make_peer()
+    four = network.choice()
+    network.add(four)
+
+    await two.bootstrap((one._uid, None))
+    await three.bootstrap((one._uid, None))
+    await four.bootstrap((one._uid, None))
+
+    # exec
+    out = await three.set(value)
+
+    # check
+    assert out == key
+    queries = []
+    for xxx in (one, two, three, four):
+        query = xxx.get(key)
+        queries.append(query)
+
+    out = await asyncio.gather(*queries, return_exceptions=True)
+    assert out == [value, value, value, value]
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_node_doesnt_know_everybody():
+    # setup
+    value = b'test value'
+    key = peer.digest(value)
+    # make network and peers
+    network = make_network()
+    one = network.choice()
+    network.add(one)
+    two = network.choice()
+    network.add(two)
+    three = network.choice()
+    network.add(three)
+    four = network.choice()
     network.add(four)
 
     await two.bootstrap((one._uid, None))
@@ -110,16 +159,16 @@ async def test_dict():
 @pytest.mark.asyncio
 async def test_bag():
     # setup
-    network = MockNetwork()
-    zero = make_peer()
+    network = make_network()
+    zero = network.choice()
     network.add(zero)
-    one = make_peer()  # bootstrap node
+    one = network.choice()  # bootstrap node
     network.add(one)
-    two = make_peer()
+    two = network.choice()
     network.add(two)
-    three = make_peer()
+    three = network.choice()
     network.add(three)
-    four = make_peer(4)
+    four = network.choice()
     network.add(four)
 
     await zero.bootstrap((one._uid, None))
@@ -131,9 +180,6 @@ async def test_bag():
     await three.bag(4, 2006)
     await two.bag(4, 42)
 
-    # check
-    assert four._bag == {4: {42, 2006}}
-
     for xxx in [zero, one, two, three, four]:
         out = await xxx.bag(4)
         assert out == {42, 2006}
@@ -143,16 +189,16 @@ async def test_bag():
 @pytest.mark.asyncio
 async def test_namespace():
     # setup
-    network = MockNetwork()
-    zero = make_peer()  # bootstrap node
+    network = make_network()
+    zero = network.choice()  # bootstrap node
     network.add(zero)
-    one = make_peer()
+    one = network.choice()
     network.add(one)
-    two = make_peer()
+    two = network.choice()
     network.add(two)
-    three = make_peer()
+    three = network.choice()
     network.add(three)
-    four = make_peer()
+    four = network.choice()
     network.add(four)
 
     await one.bootstrap((zero._uid, None))
