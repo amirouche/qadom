@@ -353,6 +353,7 @@ class _Peer:
                 elif response[0] == b'PEERS':
                     await self._welcome_peers(response[1])
                 else:
+                    self.blacklist(address)
                     log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
 
     async def set(self, value):
@@ -467,6 +468,7 @@ class _Peer:
                 elif response[0] == b'PEERS':
                     await self._welcome_peers(response[1])
                 else:
+                    self.blacklist(address)
                     log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
 
 
@@ -522,6 +524,7 @@ class _Peer:
                 elif response[0] == b'PEERS':
                     await self._welcome_peers(response[1])
                 else:
+                    self.blacklist(address)
                     log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
 
     async def _namespace_set(self, key, value):
