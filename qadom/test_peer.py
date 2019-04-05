@@ -21,10 +21,10 @@ log = logging.getLogger(__name__)
 # randomize tests but make it predictable
 SEED = os.environ.get('QADOM_SEED')
 if SEED is None:
-    PEER_COUNT_MAX = 10**2
+    PEER_COUNT_MAX = 10**1
     SEED = {
         'RANDOM_SEED': random.getrandbits(2048),
-        'PEER_COUNT': random.randint(PEER_COUNT_MAX // 3, PEER_COUNT_MAX),
+        'PEER_COUNT': random.randint(PEER_COUNT_MAX // 2 - 1, PEER_COUNT_MAX),
     }
 else:
     with open(SEED) as f:
@@ -72,9 +72,9 @@ class MockNetwork:
         return random.choice(list(self.peers.values()))
 
 
-async def make_network():
+async def make_social_network():
     log.info("network size=%r", PEER_COUNT)
-    graph = nx.barabasi_albert_graph(PEER_COUNT, 5, RANDOM_SEED)
+    graph = nx.barabasi_albert_graph(PEER_COUNT, PEER_COUNT % 5, RANDOM_SEED)
     network = MockNetwork()
     peers = dict()
     for node in graph.nodes:
@@ -89,19 +89,57 @@ async def make_network():
     return network
 
 
-cached_network = None
+cached_social_network = None
 
+async def random_social_network():
+    global cached_social_network
+    if cached_social_network is None:
+        cached_social_network = await make_social_network()
+    return cached_social_network
+
+
+cached_complete_network = None
+
+async def complete_network():
+    global cached_complete_network
+    if cached_complete_network is None:
+        log.info("network size=%r", PEER_COUNT)
+        graph = nx.complete_graph(PEER_COUNT)
+        network = MockNetwork()
+        peers = dict()
+        for node in graph.nodes:
+            peer = make_peer()
+            network.add(peer)
+            peers[node] = peer
+        for node, peer in peers.items():
+            for neighbor in graph.neighbors(node):
+                neighbor = peers[neighbor]
+                await peer.bootstrap((peer._uid, None))
+        cached_complete_network = network
+
+    return cached_complete_network
+
+
+async def make_simple_network():
+    network = MockNetwork()
+    for i in range(5):
+        peer = make_peer()
+        network.add(peer)
+    bootstrap = peer
+    for peer in network.peers.values():
+        await peer.bootstrap((bootstrap._uid, None))
+    for peer in network.peers.values():
+        await peer.bootstrap((bootstrap._uid, None))
+    return network
+
+NETWORK_MAKERS = [random_social_network, complete_network, make_simple_network]
+
+
+@pytest.mark.parametrize("make_network", NETWORK_MAKERS)
 @pytest.mark.asyncio
-@pytest.fixture()  # scope=module doesn't work with asyncio
-async def network():
-    global cached_network
-    if cached_network is None:
-        cached_network = await make_network()
-    return cached_network
+async def test_bootstrap(make_network):
+    network = await make_network()
 
-
-@pytest.mark.asyncio
-async def test_bootstrap(network):
     # setup
     one = network.choice()
     two = network.choice()
@@ -114,8 +152,10 @@ async def test_bootstrap(network):
     assert one._peers
 
 
+@pytest.mark.parametrize("make_network", NETWORK_MAKERS)
 @pytest.mark.asyncio
-async def test_dict(network):
+async def test_dict(make_network):
+    network = await make_network()
     # setup
     value = b'test value'
     key = peer.hash(value)
@@ -142,8 +182,10 @@ async def test_dict(network):
     assert out == [value, value, value, value]
 
 
+@pytest.mark.parametrize("make_network", NETWORK_MAKERS)
 @pytest.mark.asyncio
-async def test_bootstrap_node_doesnt_know_everybody(network):
+async def test_bootstrap_node_doesnt_know_everybody(make_network):
+    network = await make_network()
     # setup
     value = b'test value'
     key = peer.hash(value)
@@ -178,8 +220,10 @@ async def test_bootstrap_node_doesnt_know_everybody(network):
         assert list(out.values()) == [value] * len(out)
 
 
+@pytest.mark.parametrize("make_network", NETWORK_MAKERS)
 @pytest.mark.asyncio
-async def test_bag(network):
+async def test_bag(make_network):
+    network = await make_network()
     # setup
     zero = network.choice()
     one = network.choice()  # bootstrap node
@@ -213,8 +257,11 @@ async def test_bag(network):
         assert list(out.values()) == [{4, 2006}] * len(out)
 
 
+@pytest.mark.parametrize("make_network", NETWORK_MAKERS)
 @pytest.mark.asyncio
-async def test_namespace(network):
+async def test_namespace(make_network):
+    network = await make_network()
+
     # setup
     zero = network.choice()  # bootstrap node
     one = network.choice()
