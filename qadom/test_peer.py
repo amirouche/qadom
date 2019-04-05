@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import os
 
 import daiquiri
 import pytest
@@ -26,7 +27,8 @@ random.seed(SEED)
 
 
 # choosen so that tests don't run for too long
-PEER_COUNT_MAX = 10**5
+PEER_COUNT_MAX = os.environ.get('QADOM_PEER_COUNT_MAX')
+PEER_COUNT_MAX = int(os.environ['QADOM_PEER_COUNT_MAX']) if PEER_COUNT_MAX else 10**5
 
 
 def make_peer(uid=None):
@@ -65,6 +67,7 @@ class MockNetwork:
 def make_network():
     network = MockNetwork()
     count = random.randint(PEER_COUNT_MAX // 3, PEER_COUNT_MAX)
+    log.info("network size=%r", count)
     for i in range(count):
         peer = make_peer()
         network.add(peer)
@@ -144,8 +147,8 @@ async def test_bootstrap_node_doesnt_know_everybody():
     for xxx in (one, two, three, four):
         query = xxx.get(key)
         queries[xxx] = query
-
     canonical = await peer.gather(queries, return_exceptions=True)
+
     fallback = {}
     for xxx, response in canonical.items():
         if isinstance(response, Exception):
@@ -180,6 +183,7 @@ async def test_bag():
         query = xxx.bag(4)
         queries[xxx] = query
     canonical = await peer.gather(queries, return_exceptions=True)
+
     fallback = dict()
     for xxx, response in canonical.items():
         if isinstance(response, Exception):
@@ -223,6 +227,7 @@ async def test_namespace():
         query = xxx.namespace(2006, public_key=public_key, signature=signature)
         queries[xxx] = query
     canonical = await peer.gather(queries, return_exceptions=True)
+
     fallback = dict()
     for xxx, response in canonical.items():
         if isinstance(response, Exception):
