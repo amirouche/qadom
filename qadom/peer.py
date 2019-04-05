@@ -338,7 +338,7 @@ class _Peer:
         peers = await self.peers((None, None), pack(uid))
         return (b'PEERS', peers)
 
-    # helper
+    # helpers
 
     async def _welcome_peers(self, addresses):
         queries = dict()
@@ -353,7 +353,34 @@ class _Peer:
             self._peers[uid] = address
             self._addresses[address] = uid
 
+    async def _reach(self, uid):
+        log.debug('reach uid=%r', uid)
+        try:
+            return self._peers[uid]
+        except KeyError:
+            try:
+                # try to reach node UID
+                await self.get(uid)  # TODO: optimize
+            except KeyError:
+                pass
+            finally:
+                return self._peers[uid]
+
     # local methods
+
+    async def get_at(self, key, uid):
+        """Get the value associated with KEY at peer with identifier UID"""
+        log.debug('get_at key=%r uid=%r', key, uid)
+        try:
+            peer = await self._reach(uid)
+        except KeyError as exc:
+            raise KeyError(key) from exc
+
+        out = await self._protocol.rpc(peer, 'value', pack(key))
+        if out[0] == b'VALUE':
+            return out[1]
+        else:
+            raise KeyError(key)
 
     async def get(self, key):
         """Local method to fetch the value associated with KEY
@@ -456,8 +483,24 @@ class _Peer:
         else:
             await self._add(key, value)
 
+    async def bag_at(self, key, uid):
+        try:
+            peer = await self._reach(uid)
+        except KeyError as exc:
+            raise KeyError(key) from exc
+
+        response = await self._protocol.rpc(peer, 'search', pack(key))
+        if response[0] == b'VALUE':
+            out = unpack(response[1])
+            return out
+        else:
+            raise KeyError(key)
+
     async def _add(self, key, value):
         """Publish VALUE at KEY"""
+        # unlike kademlia store locally
+        self._bag[key].add(value)
+        # proceed
         uid = pack(key)
         value = pack(value)
         # find the nearest peers and call append rpc
@@ -503,6 +546,8 @@ class _Peer:
             peers = [address for address in peers if address not in queried]
             # no more peer to query
             if not peers:
+                # store results locally
+                self._bag[key] = self.bag[key].union(out)
                 return out
             # query selected peers
             queries = dict()
@@ -538,6 +583,30 @@ class _Peer:
             assert len(value) < 8000  # TODO: compute the real max size
             out = await self._namespace_set(key, value)
             return out
+
+    async def namespace_at(self, key, public_key, signature, uid):
+        try:
+            peer = await self._reach(uid)
+        except KeyError as exc:
+            raise KeyError((public_key, key)) from exc
+
+        key = pack(key)
+        response = await self._protocol.rpc(peer, 'namespace_get', public_key, key)
+        if response[0] == b'VALUE':
+            value = response[1]
+            public_key_object = PublicKey.from_public_bytes(public_key)
+            payload = msgpack.packb((key, value))
+            try:
+                public_key_object.verify(signature, payload)
+            except InvalidSignature as exc:
+                self.warning('invalid namespace set from %r', address)
+                self.blacklist(address)
+                raise KeyError((public_key, unpack(key))) from exc
+            else:
+                self._namespace[public_key][unpack(key)] = value
+                return value
+        else:
+            raise KeyError((public_key, unpack(key)))
 
     async def _namespace_get(self, public_key, key, signature):
         # check local namespace
@@ -576,7 +645,7 @@ class _Peer:
                     try:
                         public_key_object.verify(signature, payload)
                     except InvalidSignature:
-                        self.warning('invalid namespace set from %r', address)
+                        self.warning('invalid namespace get from %r', address)
                         self.blacklist(address)
                         continue
                     else:
@@ -590,12 +659,15 @@ class _Peer:
 
     async def _namespace_set(self, key, value):
         """Publish VALUE at KEY"""
-        key = pack(key)
         # compute identifier of the node where to store that (public_key, key, value)
         public_key = self._private_key.public_key().public_bytes(
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw
         )
+        # unlike kademlia store locally
+        self._namespace[public_key][key] = value
+        # proceed
+        key = pack(key)
         uid = pack(hash(msgpack.packb((public_key, key))))
         # find the nearest peers and call namespace_set rpc
         queried = set()
