@@ -132,7 +132,19 @@ async def make_simple_network():
         await peer.bootstrap((bootstrap._uid, None))
     return network
 
-NETWORK_MAKERS = [random_social_network, complete_network, make_simple_network]
+
+NETWORKS = os.environ.get('QADOM_NETWORKS')
+if NETWORKS:
+    NETWORK_MAKERS = list()
+    NETWORKS = NETWORKS.split(',')
+    if 'SIMPLE' in NETWORKS:
+        NETWORK_MAKERS.append(make_simple_network)
+    if 'SOCIAL' in NETWORKS:
+        NETWORK_MAKERS.append(random_social_network)
+    if 'COMPLETE' in NETWORKS:
+        NETWORK_MAKERS.append(complete_network)
+else:
+    NETWORK_MAKERS = [random_social_network, complete_network, make_simple_network]
 
 
 @pytest.mark.parametrize("make_network", NETWORK_MAKERS)
