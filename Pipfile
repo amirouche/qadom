@@ -13,6 +13,10 @@ pre-commit = "*"
 pytest-cov = "*"
 debug = "*"
 networkx = "*"
+flake8 = "*"
+rope = "*"
+jedi = "*"
+eradicate = "*"
 
 [packages]
 msgpack-python = "*"

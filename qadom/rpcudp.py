@@ -22,7 +22,6 @@
 import asyncio
 import logging
 from base64 import b64encode
-from hashlib import sha1
 from uuid import uuid4
 
 import msgpack
@@ -73,7 +72,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
         try:
             uid, type, data = msgpack.unpackb(datagram, use_list=False)
         except msgpack.UnpackException:
-            log.debug("received malformed packed from %r", addr)
+            log.debug("received malformed packed from %r", address)
             return
 
         # process message as a new request or a response

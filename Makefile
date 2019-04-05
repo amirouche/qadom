@@ -11,20 +11,20 @@ dev: # wiredtiger ## Prepare the ubuntu host sytem for development
 check: ## Run tests
 	PYTHONHASHSEED=0 PYTHONPATH=$(PWD) pipenv run pytest -vvv --cov-config .coveragerc --cov-report html --cov-report xml --cov=qadom -s	 .
 	# pipenv check  TODO: uncomment but check travis ci
-	pipenv run bandit --skip=B101 hoply/ -r
+	pipenv run bandit --skip=B101 qadom/ -r
 	@echo "\033[95m\n\nYou may now run 'make lint'.\n\033[0m"
 
 lint: ## Lint the code
-	pipenv run pylama hoply/
+	pipenv run pylama qadom/ | grep -v E501
 
 clean: ## Clean up
 	git clean -fXd
 
 todo: ## Things that should be done
-	@grep -nR --color=always TODO hoply.py
+	@grep -nR --color=always TODO qadom/
 
 xxx: ## Things that require attention
-	@grep -nR --color=always --before-context=2  --after-context=2 XXX hoply.py
+	@grep -nR --color=always --before-context=2  --after-context=2 XXX qadom/
 
 publish: check ## Publish to pypi.org
 	pipenv run python setup.py sdist upload

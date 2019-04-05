@@ -1,11 +1,9 @@
-import asyncio
 import logging
 import random
 import os
 
 import daiquiri
 import json
-import msgpack
 import networkx as nx
 import pytest
 
@@ -91,6 +89,7 @@ async def make_social_network():
 
 cached_social_network = None
 
+
 async def random_social_network():
     global cached_social_network
     if cached_social_network is None:
@@ -99,6 +98,7 @@ async def random_social_network():
 
 
 cached_complete_network = None
+
 
 async def complete_network():
     global cached_complete_network

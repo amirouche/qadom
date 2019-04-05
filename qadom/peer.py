@@ -60,7 +60,6 @@ def hash(bytes):
 
 
 UID_LENGTH = len(bin(hash(b''))) - 2
-print(UID_LENGTH)
 
 
 def iter_roots(count):
@@ -69,7 +68,6 @@ def iter_roots(count):
 
 
 class _Peer:
-
 
     def __init__(self, uid, private_key, replication=REPLICATION_DEFAULT):
         assert replication <= REPLICATION_MAX
@@ -427,8 +425,8 @@ class _Peer:
         """Store VALUE in the network.
 
         Return the uid with which it is associated aka. sha256 integer representation."""
-        if len(value) > (8192 - 28):  # datagram max size minus
-                                      # "header", see RPCProtocol.
+        # datagram max size minus "header", see RPCProtocol.
+        if len(value) > (8192 - 28):
             raise ValueError('value too big')
         uid = pack(hash(value))
         # unlike kademlia store value locally
@@ -562,7 +560,6 @@ class _Peer:
                     self.blacklist(address)
                     log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
 
-
     # namespace local method
 
     async def namespace(self, key, value=None, public_key=None, signature=None):
@@ -593,8 +590,8 @@ class _Peer:
             try:
                 public_key_object.verify(signature, payload)
             except InvalidSignature as exc:
-                self.warning('invalid namespace set from %r', address)
-                self.blacklist(address)
+                self.warning('invalid namespace set from %r', peer)
+                self.blacklist(peer)
                 raise KeyError((public_key, unpack(key))) from exc
             else:
                 self._namespace[public_key][unpack(key)] = value
