@@ -1,0 +1,3 @@
+[run]
+omit = qadom/rpcudp.py
+       qadom/test_peer.py
