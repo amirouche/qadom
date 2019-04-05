@@ -152,6 +152,20 @@ class _Peer:
         self._peers[uid] = address
         self._addresses[address] = uid
 
+    # helper
+
+    async def _is_near(self, uid):
+        """Verify in the routing table that self is near the key"""
+        peers = await self.peers((None, None), pack(uid))
+        peers = [self._addresses[address] for address in peers]
+        # XXX: MUST respect REPLICATION_MAX globally otherwise peers
+        # will get blacklisted for no good reasons!
+        peers = nearest(REPLICATION_MAX, peers, uid)
+        high = peers[-1] ^ uid
+        current = self._uid ^ uid
+        out = high > current
+        return out
+
     # remote procedures
 
     async def ping(self, address, uid):
@@ -161,9 +175,14 @@ class _Peer:
             return pack(self._uid)
         uid = unpack(uid)
         log.debug("[%r] ping uid=%r from %r", self._uid, uid, address)
-        self._peers[uid] = address
-        self._addresses[address] = uid
-        return pack(self._uid)
+        if uid == self._uid:
+            # We are try to add self to self's routing table...
+            # TODO: Explain why it is a bad idea.
+            return pack(self._uid)
+        else:
+            self._peers[uid] = address
+            self._addresses[address] = uid
+            return pack(self._uid)
 
     async def peers(self, address, uid):
         """Remote procedure that returns peers that are near UID"""
@@ -204,21 +223,15 @@ class _Peer:
             return True
         log.debug("[%r] store from %r", self._uid, address)
         uid = digest(value)
-        # verify in the routing that self is near the key
-        peers = await self.peers((None, None), pack(uid))
-        peers = [self._addresses[address] for address in peers]
-        # XXX: MUST respect REPLICATION_MAX globally otherwise peers
-        # will get blacklisted for no good reaseons!
-        peers = nearest(REPLICATION_MAX, peers, uid)
-        high = peers[-1] ^ uid
-        current = self._uid ^ uid
-        if current > high:
-            log.warning('[%r] received a value that is too far, from %r', self._uid, address)
-            self.blacklist(address)
-            # XXX: pretend the value was stored
+
+        ok = await self._is_near(uid)
+        if ok:
+            self._storage[uid] = value
             return True
         else:
-            self._storage[uid] = value
+            log.warning('[%r] received a value that is too far, by %r', self._uid, address)
+            self.blacklist(address)
+            # XXX: pretend the value was stored
             return True
 
     # bag procedures
@@ -228,16 +241,24 @@ class _Peer:
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
             return True
+
         log.debug("[%r] add key=%r value=%r from %r", self._uid, key, value, address)
-        # TODO: do more validation and blacklist if error
         key = unpack(key)
         value = unpack(value)
         if key > 2**256 or value > 2**256:
+            log.warning('[%r] received a add that is invalid, from %r', self._uid, address)
             self.blacklist(address)
             # XXX: pretend everything is ok
             return True
-        else:
+
+        ok = await self._is_near(key)
+        if ok:
             self._bag[key].add(value)
+            return True
+        else:
+            log.warning('[%r] received a add that is too far, by %r', self._uid, address)
+            self.blacklist(address)
+            # XXX: pretend the value was stored
             return True
 
     async def search(self, address, uid):
@@ -248,7 +269,6 @@ class _Peer:
             # XXX: pretend everything is ok
             return (b'PEERS', [random.randint(2**256) for x in range(self.replication)])
 
-        # TODO: check self is in the perimeter of key
         uid = unpack(uid)
         if uid in self._bag:
             values = [pack(v) for v in self._bag[uid]]
@@ -264,17 +284,25 @@ class _Peer:
             # XXX: pretend everything is ok
             return True
         log.debug('namespace_set form %r', address)
-        # TODO: check (public_key, key) is inside self's perimeter
-        public = PublicKey.from_public_bytes(public_key)
-        try:
-            public.verify(signature, msgpack.packb((key, value)))
-        except InvalidSignature:
-            log.warning('[%r] invalid signature from %r', self._uid, address)
-            # XXX: pretend everything is ok
-            return True
+        uid = digest(msgpack.packb((public_key, key)))
+
+        ok = await self._is_near(uid)
+        if ok:
+            public = PublicKey.from_public_bytes(public_key)
+            try:
+                public.verify(signature, msgpack.packb((key, value)))
+            except InvalidSignature:
+                log.warning('[%r] invalid signature from %r', self._uid, address)
+                # XXX: pretend everything is ok
+                return True
+            else:
+                # store it
+                self._namespace[public_key][unpack(key)] = value
+                return True
         else:
-            # store it
-            self._namespace[public_key][unpack(key)] = value
+            self.blacklist(address)
+            log.warning('[%r] received namespace_set that is too far, by %r', self._uid, address)
+            # XXX: pretend everything is ok
             return True
 
     async def namespace_get(self, address, public_key, key):
@@ -304,8 +332,11 @@ class _Peer:
             if isinstance(maybe_uid, Exception):
                 continue
             uid = unpack(maybe_uid)
-            self._peers[uid] = address
-            self._addresses[address] = uid
+            if uid == self._uid:
+                continue
+            else:
+                self._peers[uid] = address
+                self._addresses[address] = uid
 
     # local methods
 
@@ -442,8 +473,14 @@ class _Peer:
 
     async def _search(self, key):
         """Search values associated with KEY"""
-        key = pack(key)
         out = set()
+        if key in self._bag:
+            try:
+                out = self._bag[key]
+            except KeyError:
+                pass
+
+        key = pack(key)
         queried = set()
         while True:
             # retrieve the k nearest peers and remove already queried peers
@@ -488,6 +525,15 @@ class _Peer:
             return out
 
     async def _namespace_get(self, public_key, key, signature):
+        # check local namespace
+        if public_key in self._namespace:
+            try:
+                out = self._namespace[public_key][key]
+            except KeyError:
+                pass
+            else:
+                return out
+        # proceed
         key = pack(key)
         uid = pack(digest(msgpack.packb((public_key, key))))
         queried = set()
