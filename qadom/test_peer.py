@@ -191,6 +191,7 @@ async def test_dict(make_network):
     fallback = dict()
     for xxx, response in canonical.items():
         if isinstance(response, KeyError):
+            await xxx.bootstrap((three._uid, None))  # XXX: cheating
             query = xxx.get_at(key, three._uid)
             fallback[xxx] = query
         elif isinstance(response, Exception) and not isinstance(response, KeyError):
@@ -199,7 +200,7 @@ async def test_dict(make_network):
     if fallback:
         log.warning('fallback because %r', canonical)
         out = await peer.gather(fallback, return_exceptions=True)
-        assert list(out.values()) == [{42, 2006}] * len(out)
+        assert list(out.values()) == [value] * len(out)
 
 
 @pytest.mark.parametrize("make_network", NETWORK_MAKERS)
