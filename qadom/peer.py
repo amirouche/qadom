@@ -8,7 +8,6 @@ from heapq import nsmallest
 from hashlib import sha256
 
 import msgpack
-from bases import Bases
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as PrivateKey
@@ -158,7 +157,9 @@ class _Peer:
         log.debug('boostrap at %r', address)
         uid = await self._protocol.rpc(address, 'ping', pack(self._uid))
         uid = unpack(uid)
+        assert self._peers.get(uid) is None or self._peers.get(uid) == address
         self._peers[uid] = address
+        assert self._addresses.get(address) is None or self._addresses.get(address) == uid
         self._addresses[address] = uid
         await self._connect()
 
@@ -206,7 +207,7 @@ class _Peer:
         """Remote procedure that returns peers that are near UID"""
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return [random.randint(2**UID_LENGTH) for x in range(self.replication)]
+            return [random.randint(0, 2**UID_LENGTH) for x in range(self.replication)]
         # The code is riddle with unpack/pack calls because Peer
         # stores key/uid as integer and msgpack doesn't accept such
         # big integers hence it is required to pass them as bytes.
@@ -225,7 +226,7 @@ class _Peer:
         are near KEY"""
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(2**UID_LENGTH) for x in range(self.replication)])
+            return (b'PEERS', [random.randint(0, 2**UID_LENGTH) for x in range(self.replication)])
         log.debug("[%r] find value key=%r from %r", self._uid, key, address)
         try:
             return (b'VALUE', self._storage[unpack(key)])
@@ -249,7 +250,7 @@ class _Peer:
         else:
             log.warning('[%r] received a value that is too far, by %r', self._uid, address)
             self.blacklist(address)
-            # XXX: pretend the value was stored
+            # XXX: pretend everything is ok
             return True
 
     # bag procedures
@@ -285,7 +286,7 @@ class _Peer:
         log.debug("[%r] search uid=%r from %r", self._uid, uid, address)
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(2**UID_LENGTH) for x in range(self.replication)])
+            return (b'PEERS', [random.randint(0, 2**UID_LENGTH) for x in range(self.replication)])
 
         uid = unpack(uid)
         if uid in self._bag:
@@ -326,7 +327,7 @@ class _Peer:
     async def namespace_get(self, address, public_key, key):
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(2**UID_LENGTH) for x in range(self.replication)])
+            return (b'PEERS', [random.randint(0, 2**UID_LENGTH) for x in range(self.replication)])
 
         if public_key in self._namespace:
             try:
@@ -490,8 +491,8 @@ class _Peer:
             raise KeyError(key) from exc
 
         response = await self._protocol.rpc(peer, 'search', pack(key))
-        if response[0] == b'VALUE':
-            out = unpack(response[1])
+        if response[0] == b'VALUES':
+            out = {unpack(x) for x in response[1]}
             return out
         else:
             raise KeyError(key)

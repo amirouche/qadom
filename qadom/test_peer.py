@@ -177,21 +177,29 @@ async def test_dict(make_network):
     three = network.choice()
     four = network.choice()
 
-    await two.bootstrap((one._uid, None))
-    await three.bootstrap((one._uid, None))
-    await four.bootstrap((one._uid, None))
-
     # exec
     out = await three.set(value)
 
     # check
     assert out == key
-    queries = []
+    queries = dict()
     for xxx in (one, two, three, four):
         query = xxx.get(key)
-        queries.append(query)
-    out = await asyncio.gather(*queries, return_exceptions=True)
-    assert out == [value, value, value, value]
+        queries[xxx] = query
+    canonical = await peer.gather(queries, return_exceptions=True)
+
+    fallback = dict()
+    for xxx, response in canonical.items():
+        if isinstance(response, KeyError):
+            query = xxx.get_at(key, three._uid)
+            fallback[xxx] = query
+        elif isinstance(response, Exception) and not isinstance(response, KeyError):
+            assert False
+
+    if fallback:
+        log.warning('fallback because %r', canonical)
+        out = await peer.gather(fallback, return_exceptions=True)
+        assert list(out.values()) == [{42, 2006}] * len(out)
 
 
 @pytest.mark.parametrize("make_network", NETWORK_MAKERS)
@@ -228,7 +236,7 @@ async def test_bag(make_network):
     if fallback:
         log.warning('fallback')
         out = await peer.gather(fallback, return_exceptions=True)
-        assert list(out.values()) == [{4, 2006}] * len(out)
+        assert list(out.values()) == [{42, 2006}] * len(out)
 
 
 @pytest.mark.parametrize("make_network", NETWORK_MAKERS)
