@@ -17,6 +17,7 @@ flake8 = "*"
 rope = "*"
 jedi = "*"
 eradicate = "*"
+aiohttp-devtools = "*"
 
 [packages]
 msgpack-python = "*"
@@ -26,6 +27,10 @@ cryptography = "*"
 hoply = "==0.13.3"
 plyvel = "*"
 uvloop = "*"
+aiohttp = "*"
+aiohttp-jinja2 = "*"
+itsdangerous = "*"
+setproctitle = "*"
 
 [requires]
 python_version = "3.7"

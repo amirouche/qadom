@@ -8,6 +8,9 @@ dev: # wiredtiger ## Prepare the ubuntu host sytem for development
 #	pipenv run python setup.py develop
 	pipenv run pre-commit install --hook-type pre-push
 
+devrun:  ## Run the web app
+	PYTHONPATH=$(PWD) DEBUG=DEBUG adev runserver --livereload qadom/web.py
+
 check: ## Run tests
 	PYTHONHASHSEED=0 PYTHONPATH=$(PWD) pipenv run pytest -vvv --cov-config .coveragerc --cov-report html --cov-report xml --cov=qadom -s .
 	# pipenv check  TODO: uncomment but check travis ci

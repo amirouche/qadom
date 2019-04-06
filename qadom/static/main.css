@@ -1,0 +1,90 @@
+body {
+    background: url('bg.png');
+    font-family: 'tex_gyre_pagellaregular', serif;
+    color: black;
+    font-size: 22px;
+    line-height: 1.6em;
+    padding: 0px;
+    margin: 175px 0px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    padding: 15px;
+}
+
+p {
+    margin: 10px 0px;
+    padding: 0px;
+}
+
+a:link,
+a:active,
+a:visited {
+  color: rgb(200, 10, 10);
+  text-decoration: none;
+}
+
+/* a:visited { */
+/*   color: gray; */
+/*   text-decoration: none; */
+/* } */
+
+a:hover {
+  color: black;
+}
+
+
+#root > h1 {
+    color: white;
+    padding: 20px 15px;
+    padding-bottom: 35px;
+    border-top: 1px solid white;
+    border-bottom: 1px solid white;
+}
+
+#root > div {
+    background: hsla(0, 0%, 100%, 0.9);
+    padding: 50px 30px;
+    text-align: justify;
+    margin: 75px 0px;
+    border-bottom: white 2px solid;
+    border-top: #AAA 2px solid;
+    box-shadow: 0px 5px 3px black, 0px -3px 3px black,
+    0px -5px 5px #AAA inset, 0px 5px 5px #AAA inset;
+}
+
+#root > div > * {
+    margin: auto;
+    max-width: 700px;
+}
+
+#root > div.question > p {
+    font-size: 1.4em;
+}
+
+#root > div.question > p.metadata {
+    font-size: 1em;
+}
+
+#root > div.answered > div.question > p {
+    font-size: 1.4em;
+}
+
+#root > div.answered > div.question > p.metadata {
+    font-size: 1em;
+}
+
+hr {
+  max-width: 500px;
+  margin-bottom: 15px;
+}
+
+textarea, input {
+  width: 500px;
+  border: 0px;
+  color: white;
+}
+
+input {
+  cursor: pointer;
+}
