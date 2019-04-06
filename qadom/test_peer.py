@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 import os
@@ -8,6 +9,7 @@ import daiquiri
 import json
 import networkx as nx
 import pytest
+import uvloop
 
 from cryptography.hazmat.primitives import serialization
 
@@ -18,6 +20,9 @@ from qadom import peer
 
 daiquiri.setup(logging.INFO, outputs=('stderr',))
 log = logging.getLogger(__name__)
+
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 
 # randomize tests but make it predictable

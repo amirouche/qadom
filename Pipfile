@@ -25,6 +25,7 @@ daiquiri = "*"
 cryptography = "*"
 hoply = "==0.13.3"
 plyvel = "*"
+uvloop = "*"
 
 [requires]
 python_version = "3.7"
