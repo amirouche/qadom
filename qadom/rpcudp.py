@@ -58,7 +58,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
         self.procedures = {}
 
     def register(self, proc):
-        self.procedures[proc.__name__.encode('utf8')] = proc
+        self.procedures[proc.__name__.encode("utf8")] = proc
 
     def connection_made(self, transport):
         self._transport = transport
@@ -66,7 +66,7 @@ class RPCProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, datagram, address):
         log.debug("received datagram from %s", address)
         if len(datagram) > 8192:
-            log.warning('received big datagram from %r', address)
+            log.warning("received big datagram from %r", address)
             return
 
         try:
@@ -76,9 +76,9 @@ class RPCProtocol(asyncio.DatagramProtocol):
             return
 
         # process message as a new request or a response
-        if type == b'\x00':
+        if type == b"\x00":
             asyncio.ensure_future(self._accept_request(uid, data, address))
-        elif type == b'\x01':
+        elif type == b"\x01":
             self._accept_response(uid, data, address)
         else:
             log.debug("Received unknown message from %s, ignoring", address)
@@ -89,7 +89,9 @@ class RPCProtocol(asyncio.DatagramProtocol):
         except KeyError:
             log.warning("received unknown message %r from %r; ignoring", data, address)
         else:
-            log.debug("received response %r for message uid %r from %r", data, uid, address)
+            log.debug(
+                "received response %r for message uid %r from %r", data, uid, address
+            )
             timeout.cancel()
             future.set_result(data)
             del self._outstanding[uid]
@@ -105,8 +107,13 @@ class RPCProtocol(asyncio.DatagramProtocol):
             log.warning("has no callable method %r; ignoring request", name)
         else:
             response = await procedure(address, *args)
-            log.debug("sending response %s for msg id %s to %s", response, b64encode(uid), address)
-            data = msgpack.packb([uid, b'\x01', response])
+            log.debug(
+                "sending response %s for msg id %s to %s",
+                response,
+                b64encode(uid),
+                address,
+            )
+            data = msgpack.packb([uid, b"\x01", response])
             self._transport.sendto(data, address)
 
     def _timeout(self, uid):
@@ -124,15 +131,17 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
         """
         uid = uuid4().bytes
-        txdata = msgpack.packb([uid, b'\x00', [name, args]])
+        txdata = msgpack.packb([uid, b"\x00", [name, args]])
         if len(txdata) > 8192:
             msg = "Total length message cannot exceed 8K"
             raise MalformedMessage(msg)
-        log.debug("calling remote function %s on %s (uid %s)", name, address, b64encode(uid))
+        log.debug(
+            "calling remote function %s on %s (uid %s)", name, address, b64encode(uid)
+        )
         self._transport.sendto(txdata, address)
 
         loop = asyncio.get_event_loop()
-        if hasattr(loop, 'create_future'):
+        if hasattr(loop, "create_future"):
             future = loop.create_future()
         else:
             future = asyncio.Future()

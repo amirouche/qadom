@@ -12,8 +12,12 @@ from uuid import uuid4
 import msgpack
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as PrivateKey
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey as PrivateKey,
+)
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PublicKey as PublicKey,
+)
 
 import hoply as h
 from hoply.memory import MemoryConnexion
@@ -61,12 +65,12 @@ def nearest(k, peers, uid):
 def pack(integer):
     """Returns a bytes representation of integer in network order"""
     # TODO: bytes.lstrip(b'\x00')
-    return integer.to_bytes(32, byteorder='big')
+    return integer.to_bytes(32, byteorder="big")
 
 
 def unpack(bytes):
     """Returns an integer"""
-    return int.from_bytes(bytes, byteorder='big')
+    return int.from_bytes(bytes, byteorder="big")
 
 
 def hash(bytes):
@@ -74,16 +78,15 @@ def hash(bytes):
     return unpack(sha256(bytes).digest())
 
 
-UID_LENGTH = len(bin(hash(b''))) - 2
+UID_LENGTH = len(bin(hash(b""))) - 2
 
 
 def iter_roots(count):
     for i in range(count):
-        yield 2**i
+        yield 2 ** i
 
 
 class _Peer:
-
     def __init__(self, uid, private_key, hoply, run, replication=REPLICATION_DEFAULT):
         assert replication <= REPLICATION_MAX
 
@@ -179,12 +182,14 @@ class _Peer:
     def close(self):
         self._transport.close()
 
-    async def init(self, port, interface='127.0.0.1'):
+    async def init(self, port, interface="127.0.0.1"):
         """Start listening on the given port and interface.
 
         """
         loop = asyncio.get_event_loop()
-        listen = loop.create_datagram_endpoint(RPCProtocol, local_addr=(interface, port))
+        listen = loop.create_datagram_endpoint(
+            RPCProtocol, local_addr=(interface, port)
+        )
         self._transport, self._protocol = await listen
         # register remote procedures
         self._protocol.register(self.ping)
@@ -199,19 +204,24 @@ class _Peer:
         # populate Peer._blacklist
         @h.transactional
         def blacklisted(tr):
-            out = set(x['ip'] for x in tr.FROM('QADOM:BLACKLIST', h.var('uid'), 'ip', h.var('ip')))
+            out = set(
+                x["ip"]
+                for x in tr.FROM("QADOM:BLACKLIST", h.var("uid"), "ip", h.var("ip"))
+            )
             return out
+
         self._blacklist = await self._run(blacklisted, self._hoply)
 
         # populate Peer._peers and Peer._addresses
         @h.transactional
         def addresses(tr):
             query = h.compose(
-                tr.FROM('QADOM:PEER', h.var('uid'), 'ip', h.var('ip')),
-                tr.where('QADOM:PEER', h.var('uid'), 'port', h.var('port')),
-                pick('ip', 'port')
+                tr.FROM("QADOM:PEER", h.var("uid"), "ip", h.var("ip")),
+                tr.where("QADOM:PEER", h.var("uid"), "port", h.var("port")),
+                pick("ip", "port"),
             )
             return list(query)
+
         addresses = await self._run(addresses, self._hoply)
         await self._welcome_peers(addresses)
 
@@ -232,9 +242,9 @@ class _Peer:
             # TODO: This can blacklist the same ip multiple times
             now = int(time())
             uid = uuid4()
-            tr.add('QADOM:BLACKLIST', uid, 'ip', ip)
-            tr.add('QADOM:BLACKLIST', uid, 'created-at', now)
-            tr.add('QADOM:BLACKLIST', uid, 'modified-at', now)
+            tr.add("QADOM:BLACKLIST", uid, "ip", ip)
+            tr.add("QADOM:BLACKLIST", uid, "created-at", now)
+            tr.add("QADOM:BLACKLIST", uid, "modified-at", now)
 
         await self._run(add, self._hoply, address[0])
 
@@ -245,11 +255,11 @@ class _Peer:
         known peers.
 
         """
-        log.debug('boostrap at %r', address)
+        log.debug("boostrap at %r", address)
         await self._welcome_peers([address])
         # TODO: make Peer._connect public and update the tests
         await self._connect()
-        log.debug('bootstrap finished')
+        log.debug("bootstrap finished")
 
     async def _connect(self):
         # XXX: This is a tentative to populate the routing table with
@@ -298,7 +308,9 @@ class _Peer:
         """Remote procedure that returns peers that are near UID"""
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return [random.randint(0, 2**UID_LENGTH) for x in range(self._replication)]
+            return [
+                random.randint(0, 2 ** UID_LENGTH) for x in range(self._replication)
+            ]
         # XXX: The code is riddled with unpack/pack calls because Peer
         # stores key/uid as integer and msgpack doesn't accept such
         # big integers hence it is required to pass them as bytes.
@@ -317,13 +329,19 @@ class _Peer:
         are near KEY"""
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(0, 2**UID_LENGTH) for x in range(self._replication)])
+            return (
+                b"PEERS",
+                [random.randint(0, 2 ** UID_LENGTH) for x in range(self._replication)],
+            )
 
         log.debug("[%r] value key=%r from %r", self._uid, key, address)
 
         @h.transactional
         def out(tr, key):
-            query = (x['value'] for x in tr.FROM('QADOM:MAPPING', key, 'value', h.var('value')))
+            query = (
+                x["value"]
+                for x in tr.FROM("QADOM:MAPPING", key, "value", h.var("value"))
+            )
             try:
                 return next(query)
             except StopIteration:
@@ -332,9 +350,9 @@ class _Peer:
         out = await self._run(out, self._hoply, unpack(key))
         if out is None:
             out = await self.peers((None, None), key)
-            return (b'PEERS', out)
+            return (b"PEERS", out)
         else:
-            return (b'VALUE', out)
+            return (b"VALUE", out)
 
     async def store(self, address, value):
         """Remote procedure that stores value locally with its digest as
@@ -351,11 +369,14 @@ class _Peer:
             # store it
             @h.transactional
             def add(tr, key, value):
-                tr.add('QADOM:MAPPING', key, 'value', value)
+                tr.add("QADOM:MAPPING", key, "value", value)
+
             await self._run(add, self._hoply, key, value)
             return True
         else:
-            log.warning('[%r] received a value that is too far, by %r', self._uid, address)
+            log.warning(
+                "[%r] received a value that is too far, by %r", self._uid, address
+            )
             return False
 
     # bag procedures
@@ -370,8 +391,10 @@ class _Peer:
         # TODO: unpack can fail in some occasion catch the correct exception
         key = unpack(key)
         value = unpack(value)
-        if key > 2**UID_LENGTH or value > 2**UID_LENGTH:
-            log.warning('[%r] received a add that is invalid, from %r', self._uid, address)
+        if key > 2 ** UID_LENGTH or value > 2 ** UID_LENGTH:
+            log.warning(
+                "[%r] received a add that is invalid, from %r", self._uid, address
+            )
             # XXX: pretend everything is ok
             return True
 
@@ -380,11 +403,14 @@ class _Peer:
             # store it
             @h.transactional
             def add(tr, key, value):
-                tr.add("QADOM:BAG", key, 'value', value)
+                tr.add("QADOM:BAG", key, "value", value)
+
             await self._run(add, self._hoply, key, value)
             return True
         else:
-            log.warning('[%r] received a add that is too far, by %r', self._uid, address)
+            log.warning(
+                "[%r] received a add that is too far, by %r", self._uid, address
+            )
             return False
 
     async def search(self, address, key):
@@ -395,21 +421,27 @@ class _Peer:
         log.debug("[%r] search uid=%r from %r", self._uid, key, address)
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(0, 2**UID_LENGTH) for x in range(self._replication)])
+            return (
+                b"PEERS",
+                [random.randint(0, 2 ** UID_LENGTH) for x in range(self._replication)],
+            )
 
         key = unpack(key)
 
         @h.transactional
         def out(tr, key):
-            return list(x['value'] for x in tr.FROM("QADOM:BAG", key, 'value', h.var('value')))
+            return list(
+                x["value"] for x in tr.FROM("QADOM:BAG", key, "value", h.var("value"))
+            )
+
         out = await self._run(out, self._hoply, key)
 
         if out:
             values = [pack(value) for value in out]
-            return (b'VALUES', values)
+            return (b"VALUES", values)
         else:
             peers = await self.peers((None, None), pack(key))
-            return (b'PEERS', peers)
+            return (b"PEERS", peers)
 
     # namespace procedures
 
@@ -418,7 +450,7 @@ class _Peer:
             # XXX: pretend everything is ok
             return True
 
-        log.debug('namespace_set form %r', address)
+        log.debug("namespace_set form %r", address)
 
         uid = hash(msgpack.packb((public_key, key)))
         ok = await self._is_near(uid)
@@ -428,30 +460,36 @@ class _Peer:
                 public.verify(signature, msgpack.packb((key, value)))
             except InvalidSignature:
                 await self.blacklist(address)
-                log.warning('[%r] invalid signature from %r', self._uid, address)
+                log.warning("[%r] invalid signature from %r", self._uid, address)
                 # XXX: pretend everything is ok
                 return True
             else:
                 # store it
                 @h.transactional
                 def add(tr, public_key, key, value):
-                    tr.add('QADOM:NAMESPACE', public_key, key, value)
+                    tr.add("QADOM:NAMESPACE", public_key, key, value)
+
                 await self._run(add, self._hoply, public_key, unpack(key), value)
                 return True
         else:
-            log.warning('[%r] received namespace_set that is too far, by %r', self._uid, address)
+            log.warning(
+                "[%r] received namespace_set that is too far, by %r", self._uid, address
+            )
             return False
 
     async def namespace_get(self, address, public_key, key):
         if address[0] in self._blacklist:
             # XXX: pretend everything is ok
-            return (b'PEERS', [random.randint(0, 2**UID_LENGTH) for x in range(self._replication)])
+            return (
+                b"PEERS",
+                [random.randint(0, 2 ** UID_LENGTH) for x in range(self._replication)],
+            )
 
         @h.transactional
         def out(tr, public_key, key):
-            value = tr.FROM('QADOM:NAMESPACE', public_key, key, h.var('value'))
+            value = tr.FROM("QADOM:NAMESPACE", public_key, key, h.var("value"))
             try:
-                return next(value)['value']
+                return next(value)["value"]
             except StopIteration:
                 return None
 
@@ -460,20 +498,20 @@ class _Peer:
             # not found, return nearest peers
             uid = hash(msgpack.packb((public_key, key)))
             peers = await self.peers((None, None), pack(uid))
-            return (b'PEERS', peers)
+            return (b"PEERS", peers)
         else:
-            return (b'VALUE', out)
+            return (b"VALUE", out)
 
     # helpers
 
     async def _welcome_peers(self, addresses):
-        log.debug('[%r] welcome peers', self._uid)
+        log.debug("[%r] welcome peers", self._uid)
         queries = dict()
         for address in addresses:
             if address[0] in self._blacklist:
                 continue
             # TODO: only welcome unknown peers
-            query = self._protocol.rpc(address, 'ping', pack(self._uid))
+            query = self._protocol.rpc(address, "ping", pack(self._uid))
             queries[address] = query
         responses = await gather(queries, return_exceptions=True)
         for (address, maybe_uid) in responses.items():
@@ -487,22 +525,23 @@ class _Peer:
             @h.transactional
             def maybe_add(tr, ip, port):
                 query = h.compose(
-                    tr.FROM('QADOM:PEER', h.var('uid'), 'ip', ip),
-                    tr.where('QADOM:PEER', h.var('uid'), 'port', port),
+                    tr.FROM("QADOM:PEER", h.var("uid"), "ip", ip),
+                    tr.where("QADOM:PEER", h.var("uid"), "port", port),
                 )
                 try:
                     next(query)
                 except StopIteration:
                     uid = uuid4()
                     now = int(time())
-                    tr.add('QADOM:PEER', uid, 'ip', ip)
-                    tr.add('QADOM:PEER', uid, 'port', port)
-                    tr.add('QADOM:PEER', uid, 'created-at', now)
-                    tr.add('QADOM:PEER', uid, 'modified-at', now)
+                    tr.add("QADOM:PEER", uid, "ip", ip)
+                    tr.add("QADOM:PEER", uid, "port", port)
+                    tr.add("QADOM:PEER", uid, "created-at", now)
+                    tr.add("QADOM:PEER", uid, "modified-at", now)
+
             await self._run(maybe_add, self._hoply, *address)
 
     async def _reach(self, uid):
-        log.debug('reach uid=%r', uid)
+        log.debug("reach uid=%r", uid)
         try:
             return self._peers[uid]
         except KeyError:
@@ -519,25 +558,26 @@ class _Peer:
 
     async def get_at(self, key, uid):
         """Get the value associated with KEY at peer with identifier UID"""
-        log.debug('[%r] get_at key=%r uid=%r', self._uid, key, uid)
+        log.debug("[%r] get_at key=%r uid=%r", self._uid, key, uid)
         try:
             peer = await self._reach(uid)
         except KeyError as exc:
             raise KeyError(key) from exc
 
-        out = await self._protocol.rpc(peer, 'value', pack(key))
-        if out[0] == b'VALUE':
+        out = await self._protocol.rpc(peer, "value", pack(key))
+        if out[0] == b"VALUE":
             value = out[1]
             if hash(value) == key:
                 # store it
                 @h.transactional
                 def add(tr, key, value):
-                    tr.add('QADOM:MAPPING', key, 'value', value)
+                    tr.add("QADOM:MAPPING", key, "value", value)
+
                 await self._run(add, self._hoply, key, value)
                 # at last!
                 return value
             else:
-                log.warning('[%r] received bad value from %r', peer)
+                log.warning("[%r] received bad value from %r", peer)
                 await self.blacklist(peer)
                 return KeyError(key)
         else:
@@ -547,12 +587,15 @@ class _Peer:
         """Local method to fetch the value associated with KEY
 
         KEY must be an integer below 2^UID_LENGTH"""
-        assert key <= 2**UID_LENGTH
+        assert key <= 2 ** UID_LENGTH
 
         # check database
         @h.transactional
         def out(tr, key):
-            query = (x['value'] for x in tr.FROM('QADOM:MAPPING', key, 'value', h.var('value')))
+            query = (
+                x["value"]
+                for x in tr.FROM("QADOM:MAPPING", key, "value", h.var("value"))
+            )
             try:
                 return next(query)
             except StopIteration:
@@ -581,32 +624,40 @@ class _Peer:
             # query selected peers
             queries = dict()
             for address in peers:
-                query = self._protocol.rpc(address, 'value', uid)
+                query = self._protocol.rpc(address, "value", uid)
                 queries[address] = query
             responses = await gather(queries, return_exceptions=True)
             for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
-                elif response[0] == b'VALUE':
+                elif response[0] == b"VALUE":
                     value = response[1]
                     if hash(value) == unpack(uid):
                         # store it
                         @h.transactional
                         def add(tr, key, value):
-                            tr.add('QADOM:MAPPING', key, 'value', value)
+                            tr.add("QADOM:MAPPING", key, "value", value)
+
                         await self._run(add, self._hoply, key, value)
                         # at last!
                         return value
                     else:
-                        log.warning('[%r] bad value returned from %r', self._uid, address)
+                        log.warning(
+                            "[%r] bad value returned from %r", self._uid, address
+                        )
                         await self.blacklist(address)
                         continue
-                elif response[0] == b'PEERS':
+                elif response[0] == b"PEERS":
                     await self._welcome_peers(response[1])
                 else:
                     await self.blacklist(address)
-                    log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
+                    log.warning(
+                        "[%r] unknown response %r from %r",
+                        self._uid,
+                        response[0],
+                        address,
+                    )
 
     async def set(self, value):
         """Store VALUE in the network.
@@ -614,12 +665,13 @@ class _Peer:
         Return the uid with which it is associated aka. sha256 integer representation."""
         # datagram max size minus "header", see RPCProtocol.
         if len(value) > (8192 - 28):
-            raise ValueError('value too big')
+            raise ValueError("value too big")
         uid = pack(hash(value))
         # store it
         @h.transactional
         def add(tr, key, value):
-            tr.add('QADOM:MAPPING', key, 'value', value)
+            tr.add("QADOM:MAPPING", key, "value", value)
+
         await self._run(add, self._hoply, uid, value)
         # find the nearest peers and call store rpc
         queried = set()
@@ -631,7 +683,9 @@ class _Peer:
             # are known
             if not peers:
                 peers = await self.peers((None, None), uid)
-                queries = [self._protocol.rpc(address, 'store', value) for address in peers]
+                queries = [
+                    self._protocol.rpc(address, "store", value) for address in peers
+                ]
                 # XXX: Best effort. If the peers near uid are
                 # malicious it will fail. Without a way to replicate
                 # the value more often because legit peers will not
@@ -641,7 +695,7 @@ class _Peer:
             # query selected peers
             queries = dict()
             for address in peers:
-                query = self._protocol.rpc(address, 'peers', uid)
+                query = self._protocol.rpc(address, "peers", uid)
                 queries[address] = query
             responses = await gather(queries, return_exceptions=True)
             for (address, response) in responses.items():
@@ -674,14 +728,15 @@ class _Peer:
         except KeyError as exc:
             raise KeyError(key) from exc
 
-        response = await self._protocol.rpc(peer, 'search', pack(key))
-        if response[0] == b'VALUES':
+        response = await self._protocol.rpc(peer, "search", pack(key))
+        if response[0] == b"VALUES":
             values = {unpack(x) for x in response[1]}
             # store it
             @h.transactional
             def add(tr, key, values):
                 for value in values:
-                    tr.add("QADOM:BAG", key, 'value', value)
+                    tr.add("QADOM:BAG", key, "value", value)
+
             await self._run(add, self._hoply, key, values)
             # at last!
             return values
@@ -690,9 +745,11 @@ class _Peer:
 
     async def _add(self, key, value):
         """Publish VALUE at KEY"""
+
         @h.transactional
         def add(tr, key, value):
-            tr.add("QADOM:BAG", key, 'value', value)
+            tr.add("QADOM:BAG", key, "value", value)
+
         await self._run(add, self._hoply, key, value)
         # proceed
         uid = pack(key)
@@ -707,14 +764,16 @@ class _Peer:
             # are known
             if not peers:
                 peers = await self.peers((None, None), uid)
-                queries = [self._protocol.rpc(address, 'add', uid, value) for address in peers]
+                queries = [
+                    self._protocol.rpc(address, "add", uid, value) for address in peers
+                ]
                 # XXX: Best effort.
                 await asyncio.gather(*queries, return_exceptions=True)
                 return
             # query selected peers
             queries = dict()
             for address in peers:
-                query = self._protocol.rpc(address, 'peers', uid)
+                query = self._protocol.rpc(address, "peers", uid)
                 queries[address] = query
             responses = await gather(queries, return_exceptions=True)
             for (address, response) in responses.items():
@@ -729,7 +788,10 @@ class _Peer:
         # init with database stored values
         @h.transactional
         def values(tr, key):
-            return set(x['value'] for x in tr.FROM("QADOM:BAG", key, 'value', h.var('value')))
+            return set(
+                x["value"] for x in tr.FROM("QADOM:BAG", key, "value", h.var("value"))
+            )
+
         values = await self._run(values, self._hoply, key)
 
         key = pack(key)
@@ -744,33 +806,39 @@ class _Peer:
                 @h.transactional
                 def add(tr, key, values):
                     for value in values:
-                        tr.add("QADOM:BAG", key, 'value', value)
+                        tr.add("QADOM:BAG", key, "value", value)
+
                 await self._run(add, self._hoply, key, values)
                 # at last!
                 return values
             # query selected peers
             queries = dict()
             for address in peers:
-                query = self._protocol.rpc(address, 'search', key)
+                query = self._protocol.rpc(address, "search", key)
                 queries[address] = query
             responses = await gather(queries, return_exceptions=True)
             for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
-                elif response[0] == b'VALUES':
+                elif response[0] == b"VALUES":
                     new = set([unpack(x) for x in response[1]])
                     values = values.union(new)
-                elif response[0] == b'PEERS':
+                elif response[0] == b"PEERS":
                     await self._welcome_peers(response[1])
                 else:
                     await self.blacklist(address)
-                    log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
+                    log.warning(
+                        "[%r] unknown response %r from %r",
+                        self._uid,
+                        response[0],
+                        address,
+                    )
 
     # namespace local method
 
     async def namespace(self, key, value=None, public_key=None, signature=None):
-        assert key <= 2**UID_LENGTH
+        assert key <= 2 ** UID_LENGTH
         if value is None:
             assert isinstance(public_key, bytes)
             assert isinstance(signature, bytes)
@@ -789,22 +857,23 @@ class _Peer:
             raise KeyError((public_key, key)) from exc
 
         key = pack(key)
-        response = await self._protocol.rpc(peer, 'namespace_get', public_key, key)
-        if response[0] == b'VALUE':
+        response = await self._protocol.rpc(peer, "namespace_get", public_key, key)
+        if response[0] == b"VALUE":
             value = response[1]
             public_key_object = PublicKey.from_public_bytes(public_key)
             payload = msgpack.packb((key, value))
             try:
                 public_key_object.verify(signature, payload)
             except InvalidSignature as exc:
-                self.warning('invalid namespace set from %r', peer)
+                self.warning("invalid namespace set from %r", peer)
                 await self.blacklist(peer)
                 raise KeyError((public_key, unpack(key))) from exc
             else:
                 # store it
                 @h.transactional
                 def add(tr, public_key, key, value):
-                    tr.add('QADOM:NAMESPACE', public_key, key, value)
+                    tr.add("QADOM:NAMESPACE", public_key, key, value)
+
                 await self._run(add, self._hoply, public_key, unpack(key), value)
                 # at last!
                 return value
@@ -825,9 +894,9 @@ class _Peer:
                 # fallback to the database if present
                 @h.transactional
                 def value(tr, public_key, key):
-                    value = tr.FROM('QADOM:NAMESPACE', public_key, key, h.var('value'))
+                    value = tr.FROM("QADOM:NAMESPACE", public_key, key, h.var("value"))
                     try:
-                        return next(value)['value']
+                        return next(value)["value"]
                     except StopIteration:
                         return None
 
@@ -840,48 +909,56 @@ class _Peer:
             # query selected peers
             queries = dict()
             for address in peers:
-                query = self._protocol.rpc(address, 'namespace_get', public_key, key)
+                query = self._protocol.rpc(address, "namespace_get", public_key, key)
                 queries[address] = query
             responses = await gather(queries, return_exceptions=True)
             for (address, response) in responses.items():
                 queried.add(address)
                 if isinstance(response, Exception):
                     continue
-                elif response[0] == b'VALUE':
+                elif response[0] == b"VALUE":
                     value = response[1]
                     public_key_object = PublicKey.from_public_bytes(public_key)
                     payload = msgpack.packb((key, value))
                     try:
                         public_key_object.verify(signature, payload)
                     except InvalidSignature:
-                        self.warning('invalid namespace get from %r', address)
+                        self.warning("invalid namespace get from %r", address)
                         await self.blacklist(address)
                         continue
                     else:
                         # store it
                         @h.transactional
                         def add(tr, public_key, key, value):
-                            tr.add('QADOM:NAMESPACE', public_key, key, value)
-                        await self._run(add, self._hoply, public_key, unpack(key), value)
+                            tr.add("QADOM:NAMESPACE", public_key, key, value)
+
+                        await self._run(
+                            add, self._hoply, public_key, unpack(key), value
+                        )
                         # at last!
                         return value
-                elif response[0] == b'PEERS':
+                elif response[0] == b"PEERS":
                     await self._welcome_peers(response[1])
                 else:
                     await self.blacklist(address)
-                    log.warning('[%r] unknown response %r from %r', self._uid, response[0], address)
+                    log.warning(
+                        "[%r] unknown response %r from %r",
+                        self._uid,
+                        response[0],
+                        address,
+                    )
 
     async def _namespace_set(self, key, value):
         """Publish VALUE at KEY"""
         # compute identifier of the node where to store that (public_key, key, value)
         public_key = self._private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw
+            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
         )
         # store it
         @h.transactional
         def add(tr, public_key, key, value):
-            tr.add('QADOM:NAMESPACE', public_key, key, value)
+            tr.add("QADOM:NAMESPACE", public_key, key, value)
+
         await self._run(add, self._hoply, public_key, key, value)
         # proceed
         key = pack(key)
@@ -903,12 +980,7 @@ class _Peer:
                 queries = []
                 for address in peers:
                     query = self._protocol.rpc(
-                        address,
-                        'namespace_set',
-                        public_key,
-                        key,
-                        value,
-                        signature
+                        address, "namespace_set", public_key, key, value, signature
                     )
                     queries.append(query)
                 # XXX: Best effort.
@@ -917,7 +989,7 @@ class _Peer:
             # query selected peers
             queries = dict()
             for address in peers:
-                query = self._protocol.rpc(address, 'peers', uid)
+                query = self._protocol.rpc(address, "peers", uid)
                 queries[address] = query
             responses = await gather(queries, return_exceptions=True)
             for (address, response) in responses.items():
@@ -932,11 +1004,11 @@ async def make_peer(uid, port, private_key=None, hoply=None, run=None):
     if private_key is None:
         private_key = PrivateKey.generate()
     if hoply is None:
-        cnx = MemoryConnexion('qadom')
-        items = ('collection', 'identifier', 'key', 'value')
-        hoply = h.Hoply(cnx, 'quads', items)
+        cnx = MemoryConnexion("qadom")
+        items = ("collection", "identifier", "key", "value")
+        hoply = h.Hoply(cnx, "quads", items)
     if run is None:
-        executor = ThreadPoolExecutor(4, 'qadom:')
+        executor = ThreadPoolExecutor(4, "qadom:")
         loop = asyncio.get_event_loop()
         run = functools.partial(loop.run_in_executor, executor)
     peer = _Peer(uid, private_key, hoply, run)
