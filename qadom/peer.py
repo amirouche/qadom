@@ -249,6 +249,7 @@ class _Peer:
         await self._welcome_peers([address])
         # TODO: make Peer._connect public and update the tests
         await self._connect()
+        log.debug('bootstrap finished')
 
     async def _connect(self):
         # XXX: This is a tentative to populate the routing table with

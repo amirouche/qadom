@@ -9,7 +9,13 @@ dev: # wiredtiger ## Prepare the ubuntu host sytem for development
 	pipenv run pre-commit install --hook-type pre-push
 
 devrun:  ## Run the web app
-	PYTHONPATH=$(PWD) DEBUG=DEBUG adev runserver --livereload qadom/web.py
+	QADOM_PORT=8001 PYTHONPATH=$(PWD) DEBUG=DEBUG adev runserver --port 8000 qadom/web.py
+
+devrun2:  ## Run the web app
+	BOOTSTRAP=8001 QADOM_PORT=8003 PYTHONPATH=$(PWD) DEBUG=DEBUG adev runserver --port 8002 qadom/web.py
+
+devrun4:  ## Run the web app
+	BOOTSTRAP=8001 QADOM_PORT=8005 PYTHONPATH=$(PWD) DEBUG=DEBUG adev runserver --port 8004 qadom/web.py
 
 check: ## Run tests
 	PYTHONHASHSEED=0 PYTHONPATH=$(PWD) pipenv run pytest -vvv --cov-config .coveragerc --cov-report html --cov-report xml --cov=qadom -s .

@@ -74,17 +74,15 @@ a:hover {
     font-size: 1em;
 }
 
-hr {
-  max-width: 500px;
-  margin-bottom: 15px;
-}
+/* ask */
 
-textarea, input {
-  width: 500px;
-  border: 0px;
-  color: white;
+#root.ask form {
+    display: flex;
+    flex-direction: column;
+    margin: auto;
+    max-width: 700px;
 }
-
-input {
-  cursor: pointer;
+#root.ask form input {
+    color: black;
+    margin: 15px 0px;
 }

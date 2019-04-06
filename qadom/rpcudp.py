@@ -96,8 +96,8 @@ class RPCProtocol(asyncio.DatagramProtocol):
 
     async def _accept_request(self, uid, data, address):
         # TODO: more validation
-        if not isinstance(data, list) or len(data) != 2:
-            raise MalformedMessage("Could not read packet: %r" % data)
+        if not isinstance(data, tuple) or len(data) != 2:
+            raise MalformedMessage("Could not read packet from {}".format(address))
         name, args = data
         try:
             procedure = self.procedures[name]

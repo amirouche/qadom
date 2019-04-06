@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}ask a question - qadom{% endblock %}
+
+{% block rootclass %}ask{% endblock %}
+
+{% block root %}
+
+<h1>qadom - ask a question!</h1>
+
+<form method="POST" action="/ask/">
+    <input type="text" name="question" placeholder="How? Why? What? Who? Where?..." />
+    <input type="text" name="tags" placeholder="programming, philosophy, science, whatnot..." />
+    <input type="submit" value="ask!"/>
+</form>
+
+{% endblock %}

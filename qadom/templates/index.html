@@ -1,12 +1,47 @@
 {% extends "base.html" %}
 
-{% block title %}status - qadom{% endblock %}
+{% block title %}qadom{% endblock %}
 
 {% block rootclass %}index{% endblock %}
+
 {% block root %}
 
 <h1>qadom</h1>
+
+<!-- <div class="answered">
+     <div class="question">
+     <p>What is the purpose of parenthesis in Scheme?</p>
+     <p class="metadata">asked 2 days ago by <a href="">mu</a></p>
+     <ul><li>programming</li><li>scheme</li></ul>
+     </div>
+     <div class="answer">
+     <p>
+     It allows to delimit blocks of code. When a new
+     block start you must indent by 4 more
+     space. In general people use space but tabs
+     are also accepted because that is it how it
+     works.
+     </p>
+     <p>
+     Or all you need will be time. That is what we are hoping for. That
+     it will work for you without too much pain.
+     </p>
+     <p class="metadata">answered 2 days ago by <a href="">ruse</a></p>
+     </div>
+     </div> -->
+
+{% for question in questions %}
 <div class="question">
-    It Works!
+    <p>{{question['question']}}</p>
+    <p class="metadata">discovered {{ naturaldelta(now - question['created-at']) }} ago{% if question['author'] %}by <a href="">{{ question['author'] }}</a>{% endif %}</p>
+    <ul>
+	{% for tag in question['tags'] %}<li>{{ tag }}</li>{% endfor %}
+    </ul>
 </div>
+{% endfor %}
+
+<div class="question">
+    <p><a href="/ask/">Ask a question!</a></p>
+</div>
+
 {% endblock %}
