@@ -1,10 +1,7 @@
-import asyncio
-import functools
 import logging
 import random
 import os
 
-from concurrent.futures import ThreadPoolExecutor
 from time import time
 
 import daiquiri
