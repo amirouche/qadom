@@ -935,7 +935,7 @@ async def make_peer(uid, port, private_key=None, hoply=None, run=None):
         items = ('collection', 'identifier', 'key', 'value')
         hoply = h.Hoply(cnx, 'quads', items)
     if run is None:
-        executor = ThreadPoolExecutor(2, 'qadom:')
+        executor = ThreadPoolExecutor(4, 'qadom:')
         loop = asyncio.get_event_loop()
         run = functools.partial(loop.run_in_executor, executor)
     peer = _Peer(uid, private_key, hoply, run)
