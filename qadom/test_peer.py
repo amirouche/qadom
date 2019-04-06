@@ -86,7 +86,9 @@ class MockNetwork:
 
 async def make_social_network():
     log.info("network size=%r", PEER_COUNT)
-    graph = nx.barabasi_albert_graph(PEER_COUNT, 1 + PEER_COUNT % 5, RANDOM_SEED)
+    m = 1 + PEER_COUNT % 5
+    m = m if 1 < m < PEER_COUNT else PEER_COUNT - 1
+    graph = nx.barabasi_albert_graph(PEER_COUNT, m, RANDOM_SEED)
     network = MockNetwork()
     peers = dict()
     for node in graph.nodes:
