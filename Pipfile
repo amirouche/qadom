@@ -23,7 +23,7 @@ msgpack-python = "*"
 pytest = "*"
 daiquiri = "*"
 cryptography = "*"
-hoply = "*"
+hoply = "==0.13.3"
 plyvel = "*"
 
 [requires]

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "81c26ed3bb65bd520d81e3d391a69beace69070d0c7b7ee787c37129e55b38cd"
+            "sha256": "79fcaa29537858eee0669512d2c97b48ed8b3f835837a5f8f37df96e6b55dbe7"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -105,10 +105,10 @@
         },
         "hoply": {
             "hashes": [
-                "sha256:d9589f3514bac81e4a54e7d2e3270d511a3be298071ccaa25f851016e1431090"
+                "sha256:0290b2aec52d072d16a067eaaa4ddbe08f0e1d3f4ccde0c8bda8726e30a8f8f7"
             ],
             "index": "pypi",
-            "version": "==0.13.2"
+            "version": "==0.13.3"
         },
         "immutables": {
             "hashes": [

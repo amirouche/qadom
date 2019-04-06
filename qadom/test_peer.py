@@ -1,6 +1,11 @@
+import asyncio
+import functools
 import logging
 import random
 import os
+
+from concurrent.futures import ThreadPoolExecutor
+from time import time
 
 import daiquiri
 import json
@@ -9,6 +14,8 @@ import pytest
 
 from cryptography.hazmat.primitives import serialization
 
+import hoply as h
+from hoply.memory import MemoryConnexion
 from qadom import peer
 
 
@@ -37,10 +44,17 @@ with open('SEED.json', 'w') as f:
     json.dump(SEED, f)
 
 
+async def mock_run(proc, *args):
+    return proc(*args)
+
+
 def make_peer(uid=None):
     uid = uid if uid is not None else peer.make_uid()
     private_key = peer.PrivateKey.generate()
-    out = peer._Peer(uid, private_key, replication=3)
+    cnx = MemoryConnexion('qadom')
+    items = ('collection', 'identifier', 'key', 'value')
+    hoply = h.Hoply(cnx, 'quads', items)
+    out = peer._Peer(uid, private_key, hoply, mock_run, replication=3)
     return out
 
 
@@ -53,7 +67,10 @@ class MockProtocol:
     async def rpc(self, address, name, *args):
         peer = self.network.peers[address[0]]
         proc = getattr(peer, name)
+        start = time()
         out = await proc((self.peer._uid, None), *args)
+        delta = time() - start
+        assert delta < 5, "RPCProtocol allows 5s delay only"
         return out
 
 
@@ -120,7 +137,7 @@ async def complete_network():
     return cached_complete_network
 
 
-async def make_simple_network():
+async def simple_network():
     network = MockNetwork()
     for i in range(5):
         peer = make_peer()
@@ -138,13 +155,13 @@ if NETWORKS:
     NETWORK_MAKERS = list()
     NETWORKS = NETWORKS.split(',')
     if 'SIMPLE' in NETWORKS:
-        NETWORK_MAKERS.append(make_simple_network)
+        NETWORK_MAKERS.append(simple_network)
     if 'SOCIAL' in NETWORKS:
         NETWORK_MAKERS.append(random_social_network)
     if 'COMPLETE' in NETWORKS:
         NETWORK_MAKERS.append(complete_network)
 else:
-    NETWORK_MAKERS = [random_social_network, complete_network, make_simple_network]
+    NETWORK_MAKERS = [random_social_network, complete_network, simple_network]
 
 
 @pytest.mark.parametrize("make_network", NETWORK_MAKERS)
@@ -182,25 +199,20 @@ async def test_dict(make_network):
 
     # check
     assert out == key
-    queries = dict()
+
+    fallback = list()
     for xxx in (one, two, three, four):
-        query = xxx.get(key)
-        queries[xxx] = query
-    canonical = await peer.gather(queries, return_exceptions=True)
+        try:
+            out = await xxx.get(key)
+        except KeyError:
+            fallback.append(xxx)
+        else:
+            assert out == value
 
-    fallback = dict()
-    for xxx, response in canonical.items():
-        if isinstance(response, KeyError):
-            await xxx.bootstrap((three._uid, None))  # XXX: cheating
-            query = xxx.get_at(key, three._uid)
-            fallback[xxx] = query
-        elif isinstance(response, Exception) and not isinstance(response, KeyError):
-            assert False
-
-    if fallback:
-        log.warning('fallback because %r', canonical)
-        out = await peer.gather(fallback, return_exceptions=True)
-        assert list(out.values()) == [value] * len(out)
+    for xxx in fallback:
+        log.warning('fallback for peer %r', xxx)
+        out = await xxx.get_at(key, three._uid)
+        assert out == value
 
 
 @pytest.mark.parametrize("make_network", NETWORK_MAKERS)
