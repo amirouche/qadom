@@ -121,18 +121,11 @@ async def index(request):
     questions = await request.app.run(query, hoply)
     await request.app.run(debug, hoply)
 
-    log.critical(questions)
     now = int(time())
     context = dict(
         logged=request.logged, questions=questions, naturaldelta=naturaldelta, now=now
     )
     return request.app.render("index.html", request, context)
-
-
-@h.transactional
-def debug(tr):
-    for item in tr.FROM("QADOM:QUESTION", h.var("i"), h.var("k"), h.var("v")):
-        log.critical(item)
 
 
 @no_auth
