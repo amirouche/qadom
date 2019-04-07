@@ -94,7 +94,7 @@ your profile.
 Tools like Mastodon or Pleroma are based on recommendations by the
 W3C, among others ActivityPub, still rely on the client-server
 paradigm to create a federation, known as the Fediverse. It means that
-to take part in that universe, one needs to benevolant person to host
+to take part in that universe, one needs a benevolant person to host
 for them an instance of those softwares. It is central hub, where
 people can go, register and host their identity and make the community
 happen.
@@ -110,40 +110,42 @@ also has the advantage that you own your data and identity.
 	peers can connect to any other peer making it possible to build
 	friend of friend kind of networks.
 
-Unlike applications bases on ActivityPub, you keep control of your
+Unlike applications based on ActivityPub, you keep control of your
 identity.  There is no concept of instance like in the Fediverse. One
 does not need a backup account in case the instance they choosed goes
-away.  There is no concept of migration in Qadom. Except in case of
-network split, for a reason or another, there is a single Qadom
-network.
+away.  There is no concept of migration in Qadom.
+
+Except in case of network split, for a reason or another, there is a
+single Qadom network.
 
 Compared to gnunet, Freenet or Tor, Qadom is a trade-off for better
 performance and usability. Nonetheless, being censorship resistant and
 being able to cope with various attacks against the network are goals
 of the project. In a first step, Qadom want to proove that it is
-possible to build applications with rich interaction on a peer-to-peer
-network and an experience similar to the Fediverse. And like stated
-previously, with the great advantage of more freedom and control over
-identities.
+possible to build applications with rich interactions on a
+peer-to-peer network and an experience similar to the Fediverse. And
+like stated previously, with the great advantage of more freedom and
+full control over one's identity.
 
 Unlike Freenet, gnunet and Tor, for the time being at least, Qadom
-will (only) sercure point-to-point communications between peers. So that
-a malevolent operator will not be able to evavedrop on the whole network
-without taking part in the network somewhat honestly. It is a mechanic
-similar to HTTPS only the other end of the link knows about what one's
-intention. Also there are technics to confuse the other peers about
-one's intention that boils down to send mock traffic or forwarding
-other peers traffic. That is called cover traffic in gnunet.
+will (only) sercure point-to-point communications between peers. So
+that a malevolent operator will not be able to evavedrop on the whole
+network without taking part in the network somewhat honestly. It is a
+mechanic similar to HTTPS, only the other end of the link knows about
+what one's intention. Also, there are technics to confuse the other
+peers about one's intention that boils down to send mock traffic or
+forwarding other peers traffic. That is called cover traffic in
+gnunet.
 
 Finally, one must recognize that security is not worse than in the
 ActivityPub based applications (except if you use Tor (which,
-apparantly is also flowed anyway)). And in Qadom, one never share its
-password with a (benevolant?) third party.
+apparantly is also flowed anyway)). And with Qadom, one never share
+their password with a (benevolant?) third party.
 
 I don't know much about IPFS, Secure Scuttlebut (SSB) and DAT. So, I
 can not compare with their approach to peer-to-peer (feedback
-welcom!). One difference with those projects is that Qadom is coded in
-Python and that, a priori, it is easy to interop with from another
+welcome!). One difference with those projects is that Qadom is coded
+in Python and that, a priori, it is easy to interop with from another
 programming language.
 
 
