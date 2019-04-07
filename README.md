@@ -10,7 +10,7 @@ inspired from Quora and StackOverflow.
 
 (See below for the english version)
 
-Ce projet vise à créer un réseau social pair-a-pair de
+Ce projet vise à créer un réseau social pair-à-pair de
 question-réponse. Un système décentralisé sans serveur principal [0].
 
 Contrairement aux services centralises tel que Quora ou StackOverflow,
