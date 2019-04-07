@@ -18,7 +18,7 @@ devrun4:  ## Run the web app
 	BOOTSTRAP=8001 QADOM_PORT=8005 PYTHONPATH=$(PWD) DEBUG=DEBUG adev runserver --port 8004 qadom/web.py
 
 check: ## Run tests
-	PYTHONHASHSEED=0 PYTHONPATH=$(PWD) pipenv run pytest -vvv --cov-config .coveragerc --cov-report html --cov-report xml --cov=qadom -s .
+	QADOM_SEED=KNOWN-PASSING-SEED.json PYTHONHASHSEED=0 PYTHONPATH=$(PWD) pipenv run pytest -vvv --cov-config .coveragerc --cov-report html --cov-report xml --cov=qadom -s .
 	# pipenv check  TODO: uncomment but check travis ci
 	pipenv run bandit --skip=B101 qadom/ -r
 	@echo "\033[95m\n\nYou may now run 'make lint'.\n\033[0m"
