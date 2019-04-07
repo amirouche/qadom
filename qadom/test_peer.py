@@ -105,6 +105,11 @@ async def make_social_network():
             neighbor = peers[neighbor]
             await peer.bootstrap((peer._uid, None))
 
+    # run connect, this simulate the peers connecting to an existing
+    # network.
+    for peer in network.peers.values():
+        await peer.connect()
+
     return network
 
 
@@ -136,6 +141,12 @@ async def complete_network():
             for neighbor in graph.neighbors(node):
                 neighbor = peers[neighbor]
                 await peer.bootstrap((peer._uid, None))
+
+        # run connect, this simulate the peers connecting to an
+        # existing network.
+        for peer in network.peers.values():
+            await peer.connect()
+
         cached_complete_network = network
 
     return cached_complete_network
@@ -151,6 +162,12 @@ async def simple_network():
         await peer.bootstrap((bootstrap._uid, None))
     for peer in network.peers.values():
         await peer.bootstrap((bootstrap._uid, None))
+
+    # run connect, this simulate the peers connecting to an existing
+    # network.
+    for peer in network.peers.values():
+        await peer.connect()
+
     return network
 
 

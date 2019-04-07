@@ -257,11 +257,9 @@ class _Peer:
         """
         log.debug("boostrap at %r", address)
         await self._welcome_peers([address])
-        # TODO: make Peer._connect public and update the tests
-        await self._connect()
         log.debug("bootstrap finished")
 
-    async def _connect(self):
+    async def connect(self):
         # XXX: This is a tentative to populate the routing table with
         # enough nodes to cover 2^UID_LENGTH space and avoid lookup
         # KeyError because there is part of the space that self can
