@@ -95,7 +95,7 @@ class _Peer:
         # unique otherwise some Bad Things can happen. The uid specify
         # loosly depending on the network topology which keys that
         # peer is responsible for. uid must be in the same space as
-        # keys that is less than 2^256.
+        # keys that is less than 2^UID_LENGTH.
         self._uid = uid
 
         # equivalent to k in kademlia, also used as alpha. It specify
@@ -111,7 +111,7 @@ class _Peer:
 
         # peers stores the equivalent of the kademlia routing table
         # aka. kbuckets. Populated from database in Peer.init. uid to
-        # address mapping. XXX: if several pears have the same UID,
+        # address mapping. XXX: if several peers have the same UID,
         # they will overwrite each other. TODO: Maybe use hoply with
         # the in-memory backend to store those and be able to make
         # difference between peers having the same UID but different
@@ -322,7 +322,7 @@ class _Peer:
         out = [self._peers[x] for x in uids]
         return out
 
-    # mapping procedures (vanilla dht api)
+    # mapping procedures (almost vanilla kademlia api)
 
     async def value(self, address, key):
         """Remote procedure that returns the associated value or peers that
@@ -409,7 +409,7 @@ class _Peer:
             return True
         else:
             log.warning(
-                "[%r] received a add that is too far, by %r", self._uid, address
+                "[%r] received an add that is too far, by %r", self._uid, address
             )
             return False
 
@@ -662,7 +662,10 @@ class _Peer:
     async def set(self, value):
         """Store VALUE in the network.
 
-        Return the uid with which it is associated aka. sha256 integer representation."""
+        Return the uid with which it is associated aka. sha256 integer
+        representation as returned by custom hash function.
+
+        """
         # datagram max size minus "header", see RPCProtocol.
         if len(value) > (8192 - 28):
             raise ValueError("value too big")
@@ -709,11 +712,11 @@ class _Peer:
     async def bag(self, key, value=None):
         """Bag search and publish.
 
-        If VALUE is set, it will append VALUE to KEY in the network.
-        If VALUE is NOT set, it will lookup uid associated with KEY in
+        If VALUE is set, it will add VALUE to KEY in the network.  If
+        VALUE is NOT set, it will lookup values associated with KEY in
         the network.
 
-        Both VALUE and KEY must be integers below 2^256.
+        Both VALUE and KEY must be integers below 2^UID_LENGTH.
 
         """
         if value is None:
