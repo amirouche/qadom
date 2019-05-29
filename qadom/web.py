@@ -119,7 +119,8 @@ async def index(request):
 
     hoply = request.app["hoply"]
     questions = await request.app.run(query, hoply)
-    await request.app.run(debug, hoply)
+
+    log.warning('questions %r', questions)
 
     now = int(time())
     context = dict(
@@ -180,7 +181,7 @@ async def fetch(app, key):
     document = msgpack.unpackb(document, raw=False)
     question, tags, author = document
 
-    log.critical(document)
+    log.critical('fetched %r', document)
 
     @h.transactional
     def maybe_save(tr):
@@ -244,7 +245,7 @@ def create_app(loop):
     level = getattr(logging, level_name)
     daiquiri.setup(level=level, outputs=("stderr",))
 
-    setproctitle("socialiter")
+    setproctitle("qadom")
 
     log.info("init qadom %s", VERSION)
 
