@@ -81,7 +81,6 @@ pourrais pas comparer avec ces réseaux. Une différence avec ses
 outils, c’est que Qadom est écrit en Python et que, à priori, c’est
 facile à implémenter dans d’autres langages.
 
-
 ## What?
 
 This project aims to create a question-answer peer-to-peer social
@@ -148,14 +147,13 @@ welcome!). One difference with those projects is that Qadom is coded
 in Python and that, a priori, it is easy to interop with from another
 programming language.
 
-
 ## How?
 
 To get started, install the dependencies with the following command:
 
 ```shell
 pip install --user pipenv
-git clone https://framagit.org/amz3/qadom.git
+git clone https://github.com/amirouche/qadom
 cd qadom
 pipenv shell
 pipenv install --dev
